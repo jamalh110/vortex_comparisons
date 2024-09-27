@@ -1,0 +1,132 @@
+---
+version: '3.4'
+services:
+  benchmarker:
+    build: 
+      context: ./benchmarker
+      dockerfile: Dockerfile
+    command: >
+      /app/benchmarker ann-benchmark
+      -v ${DATASET:-./datasets/gist-960-euclidean.hdf5 }
+      -d ${DISTANCE:-l2-squared}
+      --grpcOrigin ${GRPC_ORIGIN:-weaviate:50051}
+      --httpOrigin ${HTTP_ORIGIN:-weaviate:8080}
+    volumes:
+      - $PWD/datasets:/app/datasets
+      - $PWD/results:/app/results
+  weaviate:
+    command:
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8080'
+    - --scheme
+    - http
+    image: docker.io/semitechnologies/weaviate:1.25.8
+    ports:
+      - 8080:8080
+      - 50051:50051
+      - 2112:2112
+      - 7100:7100
+      - 7101:7101
+    restart: on-failure:0
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      PROMETHEUS_MONITORING_ENABLED: 'true'
+      ENABLE_MODULES: ''
+      CLUSTER_HOSTNAME: 'benchmark_node'
+      CLUSTER_GOSSIP_BIND_PORT: '7100'
+      CLUSTER_DATA_BIND_PORT: '7101'
+      RAFT_JOIN: 'benchmark_node,benchmark_node2,benchmark_node3,benchmark_node4'
+      RAFT_BOOTSTRAP_EXPECT: 4
+  weaviate2:
+    command:
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8080'
+    - --scheme
+    - http
+    image: docker.io/semitechnologies/weaviate:1.25.8
+    ports:
+      - 8081:8080
+      - 50052:50051
+      - 2113:2112
+      - 7102:7102
+      - 7103:7103
+    restart: on-failure:0
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      PROMETHEUS_MONITORING_ENABLED: 'true'
+      ENABLE_MODULES: ''
+      CLUSTER_HOSTNAME: 'benchmark_node2'
+      CLUSTER_GOSSIP_BIND_PORT: '7102'
+      CLUSTER_DATA_BIND_PORT: '7103'
+      CLUSTER_JOIN: '128.105.144.55:7100'
+      RAFT_JOIN: 'benchmark_node,benchmark_node2,benchmark_node3,benchmark_node4'
+      RAFT_BOOTSTRAP_EXPECT: 4
+  weaviate3:
+    command:
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8080'
+    - --scheme
+    - http
+    image: docker.io/semitechnologies/weaviate:1.25.8
+    ports:
+      - 8082:8080
+      - 50053:50051
+      - 2114:2112
+      - 7104:7104
+      - 7105:7105
+    restart: on-failure:0
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      PROMETHEUS_MONITORING_ENABLED: 'true'
+      ENABLE_MODULES: ''
+      CLUSTER_HOSTNAME: 'benchmark_node3'
+      CLUSTER_GOSSIP_BIND_PORT: '7104'
+      CLUSTER_DATA_BIND_PORT: '7105'
+      CLUSTER_JOIN: '128.105.144.55:7100'
+      RAFT_JOIN: 'benchmark_node,benchmark_node2,benchmark_node3,benchmark_node4'
+      RAFT_BOOTSTRAP_EXPECT: 4
+  weaviate4:
+    command:
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8080'
+    - --scheme
+    - http
+    image: docker.io/semitechnologies/weaviate:1.25.8
+    ports:
+      - 8083:8080
+      - 50054:50051
+      - 2115:2112
+      - 7106:7106
+      - 7107:7107
+    restart: on-failure:0
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      PROMETHEUS_MONITORING_ENABLED: 'true'
+      ENABLE_MODULES: ''
+      CLUSTER_HOSTNAME: 'benchmark_node4'
+      CLUSTER_GOSSIP_BIND_PORT: '7106'
+      CLUSTER_DATA_BIND_PORT: '7107'
+      CLUSTER_JOIN: '128.105.144.55:7100'
+      RAFT_JOIN: 'benchmark_node,benchmark_node2,benchmark_node3,benchmark_node4'
+      RAFT_BOOTSTRAP_EXPECT: 4
+...
