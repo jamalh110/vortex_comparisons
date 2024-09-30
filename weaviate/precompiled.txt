@@ -1,0 +1,107 @@
+wget https://github.com/weaviate/weaviate/releases/download/v1.26.5/weaviate-v1.26.5-linux-amd64.tar.gz
+tar -xvzf weaviate-v1.26.5-linux-amd64.tar.gz
+
+replace 10.10.1.1 with IP of first machine
+
+CLUSTER_HOSTNAME="benchmark_node" \
+AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true \
+PERSISTENCE_DATA_PATH="./data" \
+CLUSTER_GOSSIP_BIND_PORT="7100" \
+CLUSTER_DATA_BIND_PORT="7101" \
+RAFT_JOIN="benchmark_node,benchmark_node2" \
+RAFT_BOOTSTRAP_EXPECT=2 \
+./weaviate --host 0.0.0.0 --port 8080 --scheme http
+
+
+CLUSTER_HOSTNAME="benchmark_node2" \
+CLUSTER_JOIN="10.10.1.1:7100" \
+AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true \
+PERSISTENCE_DATA_PATH="./data" \
+CLUSTER_GOSSIP_BIND_PORT="7100" \
+CLUSTER_DATA_BIND_PORT="7101" \
+RAFT_JOIN="benchmark_node,benchmark_node2" \
+RAFT_BOOTSTRAP_EXPECT=2 \
+./weaviate --host 0.0.0.0 --port 8080 --scheme http
+
+
+If that doesn't work, try this, replacing 10.10.1.1 with IP of machines:
+
+CLUSTER_HOSTNAME="benchmark_node" \
+AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true \
+PERSISTENCE_DATA_PATH="./data" \
+CLUSTER_GOSSIP_BIND_PORT="7100" \
+CLUSTER_DATA_BIND_PORT="7101" \
+RAFT_JOIN="benchmark_node,benchmark_node2" \
+RAFT_BOOTSTRAP_EXPECT=2 \
+CLUSTER_ADVERTISE_ADDR="10.10.1.1" \
+CLUSTER_ADVERTISE_PORT="7100" \
+./weaviate --host 10.10.1.1 --port 8080 --scheme http
+
+CLUSTER_HOSTNAME="benchmark_node2" \
+CLUSTER_JOIN="10.10.1.1:7100" \
+AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true \
+PERSISTENCE_DATA_PATH="./data" \
+CLUSTER_GOSSIP_BIND_PORT="7100" \
+CLUSTER_DATA_BIND_PORT="7101" \
+RAFT_JOIN="benchmark_node,benchmark_node2" \
+RAFT_BOOTSTRAP_EXPECT=2 \
+CLUSTER_ADVERTISE_ADDR="10.10.1.2" \
+CLUSTER_ADVERTISE_PORT="7100" \
+./weaviate --host 10.10.1.2 --port 8080 --scheme http
+
+
+Use this python to sanity check:
+
+import weaviate
+import pprint
+
+#client = weaviate.connect_to_local(host="128.105.144.68")
+client = weaviate.connect_to_local(host="10.10.1.1")
+#client = weaviate.connect_to_local()
+
+try:
+    nodes_info = client.cluster.nodes(
+        #collection="JeopardyQuestion",  # If omitted, all collections will be returned
+        output="verbose"  #  If omitted, will be "minimal"
+    )
+    pprint.pprint(nodes_info)
+
+finally:
+    client.close()
+
+  
+To run benchmarker:
+
+Install go:
+wget https://golang.org/dl/go1.22.0.linux-amd64.tar.gz &&
+tar -C ~/ -xzf go1.22.0.linux-amd64.tar.gz &&
+export PATH=$HOME/go/bin:$PATH &&
+go version
+
+Install hdf5:
+wget https://github.com/HDFGroup/hdf5/releases/download/hdf5_1.14.4.3/hdf5-1.14.4-3.tar.gz &&
+tar zxf hdf5-1.14.4-3.tar.gz &&
+cd hdf5-1.14.4-3/ &&
+./configure --prefix=$HOME/hdf5 &&
+make &&
+make install
+
+export LD_LIBRARY_PATH=$HOME/hdf5/lib:$LD_LIBRARY_PATH
+export CPATH=$HOME/hdf5/include:$CPATH
+export LIBRARY_PATH=$HOME/hdf5/lib:$LIBRARY_PATH
+
+source ~/.bashrc  # or ~/.zshrc
+
+git clone https://github.com/weaviate/weaviate-benchmarking.git
+
+navigate to weaviate-benchmarking/benchmarker
+
+go mod init benchmarker
+CGO_ENABLED=1 go build -o benchmarker .
+
+mkdir datasets
+curl -o ./datasets/gist-960-euclidean.hdf5 https://ann-benchmarks.com/gist-960-euclidean.hdf5
+
+./benchmarker ann-benchmark -v ./datasets/gist-960-euclidean.hdf5 -d l2-squared --grpcOrigin 10.10.1.1:50051 --httpOrigin 10.10.1.1:8080 
+
+if 2nd time run -q to only query not load
