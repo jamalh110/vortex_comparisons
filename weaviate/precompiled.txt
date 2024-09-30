@@ -49,6 +49,7 @@ CLUSTER_ADVERTISE_ADDR="10.10.1.2" \
 CLUSTER_ADVERTISE_PORT="7100" \
 ./weaviate --host 10.10.1.2 --port 8080 --scheme http
 
+Can also add this if desired PROMETHEUS_MONITORING_ENABLED=true
 
 Use this python to sanity check:
 
