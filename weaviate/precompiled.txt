@@ -84,7 +84,7 @@ wget https://github.com/HDFGroup/hdf5/releases/download/hdf5_1.14.4.3/hdf5-1.14.
 tar zxf hdf5-1.14.4-3.tar.gz &&
 cd hdf5-1.14.4-3/ &&
 ./configure --prefix=$HOME/hdf5 &&
-make &&
+make -j20 &&
 make install
 
 export LD_LIBRARY_PATH=$HOME/hdf5/lib:$LD_LIBRARY_PATH
