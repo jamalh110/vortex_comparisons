@@ -4,7 +4,7 @@ cd qdrant
 wget https://github.com/qdrant/qdrant/releases/download/v1.11.5/qdrant-x86_64-unknown-linux-gnu.tar.gz
 tar -xvzf qdrant-x86_64-unknown-linux-gnu.tar.gz
 
-copy config file from config.yaml
+copy config file from config.yaml, name it config.yaml
 
 hostname -I to get IP
 
