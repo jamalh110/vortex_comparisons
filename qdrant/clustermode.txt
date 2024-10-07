@@ -6,7 +6,7 @@ tar -xvzf qdrant-x86_64-unknown-linux-gnu.tar.gz
 
 copy config file from config.yaml, name it config.yaml
 
-hostname -I to get IP
+hostname -I to get IP on machine 1
 
 machine 1:
 ./qdrant --config-path ./config.yaml --uri 'http://x.x.x.x:6335'
