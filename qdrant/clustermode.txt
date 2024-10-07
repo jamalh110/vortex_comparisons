@@ -13,3 +13,4 @@ machine 1:
 
 machine 2+:
 ./qdrant --config-path ./config.yaml --bootstrap 'http://x.x.x.x:6335'
+note that the IP here should be the IP of machine 1
