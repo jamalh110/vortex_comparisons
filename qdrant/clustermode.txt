@@ -1,0 +1,15 @@
+mkdir qdrant
+cd qdrant
+
+wget https://github.com/qdrant/qdrant/releases/download/v1.11.5/qdrant-x86_64-unknown-linux-gnu.tar.gz
+tar -xvzf qdrant-x86_64-unknown-linux-gnu.tar.gz
+
+copy config file from config.yaml
+
+hostname -I to get IP
+
+machine 1:
+./qdrant --config-path ./config.yaml --uri 'http://x.x.x.x:6335'
+
+machine 2+:
+./qdrant --config-path ./config.yaml --bootstrap 'http://x.x.x.x:6335'
