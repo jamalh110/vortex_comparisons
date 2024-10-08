@@ -17,3 +17,40 @@ note that the IP here should be the IP of machine 1
 can also provide --uri here and set it to the IP of the current machine, but i did not need it
 
 If debugging is required, try setting host IP in config.yaml
+
+to test, curl -X GET http://localhost:6333/cluster
+
+To run benchmarker:
+
+git clone https://github.com/qdrant/vector-db-benchmark.git
+cd vector-db-benchmark/
+pip install --user poetry
+poetry install
+
+cd experiments/configurations/
+nano qdrant-cluster.json
+
+paste:
+
+[
+  {
+    "name": "qdrant-cluster-default",
+    "engine": "qdrant",
+    "connection_params": { "timeout": 30 },
+    "collection_params": {
+      "optimizers_config": { "memmap_threshold": 10000000 },
+      "shard_number": 4
+    },
+    "search_params": [
+      { "parallel": 8, "config": { "hnsw_ef": 128 } }
+    ],
+    "upload_params": { "parallel": 16, "batch_size": 1024 }
+  }
+]
+
+poetry shell
+python -m run --engines qdrant-cluster-* --datasets gist-960-euclidean
+
+to verify it worked:
+curl -X GET http://localhost:6333/collections/benchmark
+GET http://localhost:6333/collections/benchmark/cluster
