@@ -25,6 +25,7 @@ To run benchmarker:
 git clone https://github.com/qdrant/vector-db-benchmark.git
 cd vector-db-benchmark/
 pip install --user poetry
+source ~/.profile
 poetry install
 
 cd experiments/configurations/
