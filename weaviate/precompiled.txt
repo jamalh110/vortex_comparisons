@@ -108,3 +108,7 @@ curl -o ./datasets/gist-960-euclidean.hdf5 https://ann-benchmarks.com/gist-960-e
 ./benchmarker ann-benchmark -v ./datasets/gist-960-euclidean.hdf5 -d l2-squared --grpcOrigin 10.10.1.1:50051 --httpOrigin 10.10.1.1:8080 
 
 if 2nd time run -q to only query not load
+
+to set efc, m, l, and p:
+
+./benchmarker ann-benchmark -v ./datasets/gist-960-euclidean.hdf5 -d l2-squared --grpcOrigin 128.84.139.26:50051 --httpOrigin 128.84.139.26:8081 -p 1 -l 100 --efConstruction 512 --maxConnections 32 
