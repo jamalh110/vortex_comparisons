@@ -1,0 +1,37 @@
+For k8:
+
+on master node:
+curl -sfL https://get.k3s.io | sh -
+wget https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz
+tar -zxvf helm-v3.16.2-linux-amd64.tar.gz
+mkdir bin
+mv linux-amd64/helm bin/helm
+get url via: hostname -i
+get token via: sudo cat /var/lib/rancher/k3s/server/node-token
+
+on each worker node:
+curl -sfL https://get.k3s.io | K3S_URL=<ip>:6443 K3S_TOKEN=mynodetoken sh -
+
+
+On master node:
+sudo kubectl get sc
+sudo ~/bin/helm repo add milvus https://zilliztech.github.io/milvus-helm/
+sudo ~/bin/helm repo update
+sudo ~/bin/helm install my-release milvus/milvus
+check this until all pods are running and ready:
+sudo kubectl get pods
+
+sudo kubectl port-forward --address 0.0.0.0 service/my-release-milvus 19530:19530 &
+to stop forwarding, run:
+ps -ef|grep port-forward
+and kill them
+
+links:
+https://docs.k3s.io/quick-start
+https://milvus.io/docs/install_cluster-helm.md
+https://docs.k3s.io/installation/uninstall
+https://milvus.io/docs/allocate.md?tab=standalone
+https://artifacthub.io/packages/helm/milvus/milvus
+
+For docker GPU:
+install nvidia driver 550, nvidia container toolkit, nvidia container runtime
