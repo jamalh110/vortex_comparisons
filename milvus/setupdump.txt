@@ -1,0 +1,85 @@
+wget https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz
+tar -zxvf helm-v3.16.2-linux-amd64.tar.gz
+
+//add to path
+mkdir bin
+mv linux-amd64/helm bin/helm
+source .profile
+
+//maybe not necesary because of below
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+OR
+chmod +x kubectl
+mkdir -p ~/.local/bin
+mv ./kubectl ~/.local/bin/kubectl
+# and then append (or prepend) ~/.local/bin to $PATH
+
+
+sudo swapoff -a
+
+wget https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.15/cri-dockerd-0.3.15.amd64.tgz
+sudo mv ./cri-dockerd/cri-dockerd /usr/local/bin/ 
+cri-dockerd --help
+wget https://raw.githubusercontent.com/Mirantis/cri-dockerd/master/packaging/systemd/cri-docker.service
+wget https://raw.githubusercontent.com/Mirantis/cri-dockerd/master/packaging/systemd/cri-docker.socket
+sudo mv cri-docker.socket cri-docker.service /etc/systemd/system/
+sudo sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+sudo systemctl daemon-reload
+sudo systemctl enable cri-docker.service
+sudo systemctl enable --now cri-docker.socket
+sudo systemctl status cri-docker.socket
+
+sudo apt-get update
+sudo apt-get install -y apt-transport-https ca-certificates curl gpg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+//idk what this
+sudo systemctl enable --now kubelet
+
+
+//maybe?
+# sysctl params required by setup, params persist across reboots
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.ipv4.ip_forward = 1
+EOF
+# Apply sysctl params without reboot
+sudo sysctl --system
+
+
+stat -fc %T /sys/fs/cgroup/
+check if cgroup2
+
+https://github.com/containerd/containerd/discussions/8033#discussioncomment-7743698
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+  SystemdCgroup = true
+sudo systemctl restart containerd
+
+sudo nano /var/lib/kubelet/config.yaml
+cgroupDriver: systemd
+
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+
+ip route show
+hostname -i
+
+
+https://docs.k3s.io/quick-start
+wget https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz
+tar -zxvf helm-v3.16.2-linux-amd64.tar.gz
+mkdir bin
+mv linux-amd64/helm bin/helm
+source .profile
+https://milvus.io/docs/install_cluster-helm.md
+sudo ~/bin/helm install my-release milvus/milvus
+
+
