@@ -1,0 +1,135 @@
+[
+  {
+    "name": "weaviate-m-16-ef-256",
+    "engine": "weaviate",
+    "connection_params": {
+      "timeout_config": 1000
+    },
+    "collection_params": { "vectorIndexConfig": { "efConstruction": 256, "maxConnections": 16 } },
+    "search_params": [
+      { "parallel": 1, "config": { "ef": 64} }, { "parallel": 1, "config": { "ef": 128} }, { "parallel": 1, "config": { "ef": 256} }, { "parallel": 1, "config": { "ef": 512} },
+      { "parallel": 2, "config": { "ef": 64} }, { "parallel": 2, "config": { "ef": 128} }, { "parallel": 2, "config": { "ef": 256} }, { "parallel": 2, "config": { "ef": 512} },
+      { "parallel": 4, "config": { "ef": 64} }, { "parallel": 4, "config": { "ef": 128} }, { "parallel": 4, "config": { "ef": 256} }, { "parallel": 4, "config": { "ef": 512} },
+      { "parallel": 8, "config": { "ef": 64} }, { "parallel": 8, "config": { "ef": 128} }, { "parallel": 8, "config": { "ef": 256} }, { "parallel": 8, "config": { "ef": 512} },
+      { "parallel": 16, "config": { "ef": 64} }, { "parallel": 16, "config": { "ef": 128} }, { "parallel": 16, "config": { "ef": 256} }, { "parallel": 16, "config": { "ef": 512} },
+      { "parallel": 32, "config": { "ef": 64} }, { "parallel": 32, "config": { "ef": 128} }, { "parallel": 32, "config": { "ef": 256} }, { "parallel": 32, "config": { "ef": 512} },
+      { "parallel": 64, "config": { "ef": 64} }, { "parallel": 64, "config": { "ef": 128} }, { "parallel": 64, "config": { "ef": 256} }, { "parallel": 64, "config": { "ef": 512} },
+      { "parallel": 100, "config": { "ef": 64} }, { "parallel": 100, "config": { "ef": 128} }, { "parallel": 100, "config": { "ef": 256} }, { "parallel": 100, "config": { "ef": 512} }
+    ],
+    "upload_params": { "batch_size": 1024, "parallel": 8 }
+  },
+  {
+    "name": "weaviate-m-16-ef-128",
+    "engine": "weaviate",
+    "connection_params": {
+      "timeout_config": 1000
+    },
+    "collection_params": { "vectorIndexConfig": { "efConstruction": 128, "maxConnections": 16 } },
+    "search_params": [
+      { "parallel": 1, "config": { "ef": 64} }, { "parallel": 1, "config": { "ef": 128} }, { "parallel": 1, "config": { "ef": 256} }, { "parallel": 1, "config": { "ef": 512} },
+      { "parallel": 2, "config": { "ef": 64} }, { "parallel": 2, "config": { "ef": 128} }, { "parallel": 2, "config": { "ef": 256} }, { "parallel": 2, "config": { "ef": 512} },
+      { "parallel": 4, "config": { "ef": 64} }, { "parallel": 4, "config": { "ef": 128} }, { "parallel": 4, "config": { "ef": 256} }, { "parallel": 4, "config": { "ef": 512} },
+      { "parallel": 8, "config": { "ef": 64} }, { "parallel": 8, "config": { "ef": 128} }, { "parallel": 8, "config": { "ef": 256} }, { "parallel": 8, "config": { "ef": 512} },
+      { "parallel": 16, "config": { "ef": 64} }, { "parallel": 16, "config": { "ef": 128} }, { "parallel": 16, "config": { "ef": 256} }, { "parallel": 16, "config": { "ef": 512} },
+      { "parallel": 32, "config": { "ef": 64} }, { "parallel": 32, "config": { "ef": 128} }, { "parallel": 32, "config": { "ef": 256} }, { "parallel": 32, "config": { "ef": 512} },
+      { "parallel": 64, "config": { "ef": 64} }, { "parallel": 64, "config": { "ef": 128} }, { "parallel": 64, "config": { "ef": 256} }, { "parallel": 64, "config": { "ef": 512} },
+      { "parallel": 100, "config": { "ef": 64} }, { "parallel": 100, "config": { "ef": 128} }, { "parallel": 100, "config": { "ef": 256} }, { "parallel": 100, "config": { "ef": 512} }
+    ],
+    "upload_params": { "batch_size": 1024, "parallel": 8 }
+  },
+  {
+    "name": "weaviate-m-32-ef-128",
+    "engine": "weaviate",
+    "connection_params": {
+      "timeout_config": 1000
+    },
+    "collection_params": { "vectorIndexConfig": { "efConstruction": 128, "maxConnections": 32 } },
+    "search_params": [
+      { "parallel": 1, "config": { "ef": 64} }, { "parallel": 1, "config": { "ef": 128} }, { "parallel": 1, "config": { "ef": 256} }, { "parallel": 1, "config": { "ef": 512} },
+      { "parallel": 2, "config": { "ef": 64} }, { "parallel": 2, "config": { "ef": 128} }, { "parallel": 2, "config": { "ef": 256} }, { "parallel": 2, "config": { "ef": 512} },
+      { "parallel": 4, "config": { "ef": 64} }, { "parallel": 4, "config": { "ef": 128} }, { "parallel": 4, "config": { "ef": 256} }, { "parallel": 4, "config": { "ef": 512} },
+      { "parallel": 8, "config": { "ef": 64} }, { "parallel": 8, "config": { "ef": 128} }, { "parallel": 8, "config": { "ef": 256} }, { "parallel": 8, "config": { "ef": 512} },
+      { "parallel": 16, "config": { "ef": 64} }, { "parallel": 16, "config": { "ef": 128} }, { "parallel": 16, "config": { "ef": 256} }, { "parallel": 16, "config": { "ef": 512} },
+      { "parallel": 32, "config": { "ef": 64} }, { "parallel": 32, "config": { "ef": 128} }, { "parallel": 32, "config": { "ef": 256} }, { "parallel": 32, "config": { "ef": 512} },
+      { "parallel": 64, "config": { "ef": 64} }, { "parallel": 64, "config": { "ef": 128} }, { "parallel": 64, "config": { "ef": 256} }, { "parallel": 64, "config": { "ef": 512} },
+      { "parallel": 100, "config": { "ef": 64} }, { "parallel": 100, "config": { "ef": 128} }, { "parallel": 100, "config": { "ef": 256} }, { "parallel": 100, "config": { "ef": 512} }
+    ],
+    "upload_params": { "batch_size": 1024, "parallel": 8 }
+  },
+  {
+    "name": "weaviate-m-32-ef-256",
+    "engine": "weaviate",
+    "connection_params": {
+      "timeout_config": 1000
+    },
+    "collection_params": { "vectorIndexConfig": { "efConstruction": 256, "maxConnections": 32 } },
+    "search_params": [
+      { "parallel": 1, "config": { "ef": 64} }, { "parallel": 1, "config": { "ef": 128} }, { "parallel": 1, "config": { "ef": 256} }, { "parallel": 1, "config": { "ef": 512} },
+      { "parallel": 2, "config": { "ef": 64} }, { "parallel": 2, "config": { "ef": 128} }, { "parallel": 2, "config": { "ef": 256} }, { "parallel": 2, "config": { "ef": 512} },
+      { "parallel": 4, "config": { "ef": 64} }, { "parallel": 4, "config": { "ef": 128} }, { "parallel": 4, "config": { "ef": 256} }, { "parallel": 4, "config": { "ef": 512} },
+      { "parallel": 8, "config": { "ef": 64} }, { "parallel": 8, "config": { "ef": 128} }, { "parallel": 8, "config": { "ef": 256} }, { "parallel": 8, "config": { "ef": 512} },
+      { "parallel": 16, "config": { "ef": 64} }, { "parallel": 16, "config": { "ef": 128} }, { "parallel": 16, "config": { "ef": 256} }, { "parallel": 16, "config": { "ef": 512} },
+      { "parallel": 32, "config": { "ef": 64} }, { "parallel": 32, "config": { "ef": 128} }, { "parallel": 32, "config": { "ef": 256} }, { "parallel": 32, "config": { "ef": 512} },
+      { "parallel": 64, "config": { "ef": 64} }, { "parallel": 64, "config": { "ef": 128} }, { "parallel": 64, "config": { "ef": 256} }, { "parallel": 64, "config": { "ef": 512} },
+      { "parallel": 100, "config": { "ef": 64} }, { "parallel": 100, "config": { "ef": 128} }, { "parallel": 100, "config": { "ef": 256} }, { "parallel": 100, "config": { "ef": 512} }
+    ],
+    "upload_params": { "batch_size": 1024, "parallel": 8 }
+  },
+  {
+    "name": "weaviate-m-32-ef-512",
+    "engine": "weaviate",
+    "connection_params": {
+      "timeout_config": 1000
+    },
+    "collection_params": { "vectorIndexConfig": { "efConstruction": 512, "maxConnections": 32 } },
+    "search_params": [
+      { "parallel": 1, "config": { "ef": 64} }, { "parallel": 1, "config": { "ef": 128} }, { "parallel": 1, "config": { "ef": 256} }, { "parallel": 1, "config": { "ef": 512} },
+      { "parallel": 2, "config": { "ef": 64} }, { "parallel": 2, "config": { "ef": 128} }, { "parallel": 2, "config": { "ef": 256} }, { "parallel": 2, "config": { "ef": 512} },
+      { "parallel": 4, "config": { "ef": 64} }, { "parallel": 4, "config": { "ef": 128} }, { "parallel": 4, "config": { "ef": 256} }, { "parallel": 4, "config": { "ef": 512} },
+      { "parallel": 8, "config": { "ef": 64} }, { "parallel": 8, "config": { "ef": 128} }, { "parallel": 8, "config": { "ef": 256} }, { "parallel": 8, "config": { "ef": 512} },
+      { "parallel": 16, "config": { "ef": 64} }, { "parallel": 16, "config": { "ef": 128} }, { "parallel": 16, "config": { "ef": 256} }, { "parallel": 16, "config": { "ef": 512} },
+      { "parallel": 32, "config": { "ef": 64} }, { "parallel": 32, "config": { "ef": 128} }, { "parallel": 32, "config": { "ef": 256} }, { "parallel": 32, "config": { "ef": 512} },
+      { "parallel": 64, "config": { "ef": 64} }, { "parallel": 64, "config": { "ef": 128} }, { "parallel": 64, "config": { "ef": 256} }, { "parallel": 64, "config": { "ef": 512} },
+      { "parallel": 100, "config": { "ef": 64} }, { "parallel": 100, "config": { "ef": 128} }, { "parallel": 100, "config": { "ef": 256} }, { "parallel": 100, "config": { "ef": 512} }
+    ],
+    "upload_params": { "batch_size": 1024, "parallel": 8 }
+  },
+  {
+    "name": "weaviate-m-64-ef-256",
+    "engine": "weaviate",
+    "connection_params": {
+      "timeout_config": 1000
+    },
+    "collection_params": { "vectorIndexConfig": { "efConstruction": 256, "maxConnections": 64 } },
+    "search_params": [
+      { "parallel": 1, "config": { "ef": 64} }, { "parallel": 1, "config": { "ef": 128} }, { "parallel": 1, "config": { "ef": 256} }, { "parallel": 1, "config": { "ef": 512} },
+      { "parallel": 2, "config": { "ef": 64} }, { "parallel": 2, "config": { "ef": 128} }, { "parallel": 2, "config": { "ef": 256} }, { "parallel": 2, "config": { "ef": 512} },
+      { "parallel": 4, "config": { "ef": 64} }, { "parallel": 4, "config": { "ef": 128} }, { "parallel": 4, "config": { "ef": 256} }, { "parallel": 4, "config": { "ef": 512} },
+      { "parallel": 8, "config": { "ef": 64} }, { "parallel": 8, "config": { "ef": 128} }, { "parallel": 8, "config": { "ef": 256} }, { "parallel": 8, "config": { "ef": 512} },
+      { "parallel": 16, "config": { "ef": 64} }, { "parallel": 16, "config": { "ef": 128} }, { "parallel": 16, "config": { "ef": 256} }, { "parallel": 16, "config": { "ef": 512} },
+      { "parallel": 32, "config": { "ef": 64} }, { "parallel": 32, "config": { "ef": 128} }, { "parallel": 32, "config": { "ef": 256} }, { "parallel": 32, "config": { "ef": 512} },
+      { "parallel": 64, "config": { "ef": 64} }, { "parallel": 64, "config": { "ef": 128} }, { "parallel": 64, "config": { "ef": 256} }, { "parallel": 64, "config": { "ef": 512} },
+      { "parallel": 100, "config": { "ef": 64} }, { "parallel": 100, "config": { "ef": 128} }, { "parallel": 100, "config": { "ef": 256} }, { "parallel": 100, "config": { "ef": 512} }
+    ],
+    "upload_params": { "batch_size": 1024, "parallel": 8 }
+  },
+  {
+    "name": "weaviate-m-64-ef-512",
+    "engine": "weaviate",
+    "connection_params": {
+      "timeout_config": 1000
+    },
+    "collection_params": { "vectorIndexConfig": { "efConstruction": 512, "maxConnections": 64 } },
+    "search_params": [
+      { "parallel": 1, "config": { "ef": 64} }, { "parallel": 1, "config": { "ef": 128} }, { "parallel": 1, "config": { "ef": 256} }, { "parallel": 1, "config": { "ef": 512} },
+      { "parallel": 2, "config": { "ef": 64} }, { "parallel": 2, "config": { "ef": 128} }, { "parallel": 2, "config": { "ef": 256} }, { "parallel": 2, "config": { "ef": 512} },
+      { "parallel": 4, "config": { "ef": 64} }, { "parallel": 4, "config": { "ef": 128} }, { "parallel": 4, "config": { "ef": 256} }, { "parallel": 4, "config": { "ef": 512} },
+      { "parallel": 8, "config": { "ef": 64} }, { "parallel": 8, "config": { "ef": 128} }, { "parallel": 8, "config": { "ef": 256} }, { "parallel": 8, "config": { "ef": 512} },
+      { "parallel": 16, "config": { "ef": 64} }, { "parallel": 16, "config": { "ef": 128} }, { "parallel": 16, "config": { "ef": 256} }, { "parallel": 16, "config": { "ef": 512} },
+      { "parallel": 32, "config": { "ef": 64} }, { "parallel": 32, "config": { "ef": 128} }, { "parallel": 32, "config": { "ef": 256} }, { "parallel": 32, "config": { "ef": 512} },
+      { "parallel": 64, "config": { "ef": 64} }, { "parallel": 64, "config": { "ef": 128} }, { "parallel": 64, "config": { "ef": 256} }, { "parallel": 64, "config": { "ef": 512} },
+      { "parallel": 100, "config": { "ef": 64} }, { "parallel": 100, "config": { "ef": 128} }, { "parallel": 100, "config": { "ef": 256} }, { "parallel": 100, "config": { "ef": 512} }
+    ],
+    "upload_params": { "batch_size": 1024, "parallel": 8 }
+  }
+]
