@@ -6,10 +6,15 @@ from collections import defaultdict
 import json 
 
 EMBEDDINGS_LOC = './gist'
+#NAME='gist_random'
+#NAME='gist_repeated'
+#NAME='gist_base_random'
+NAME='gist_shifted'
 
+np.random.seed(42)
 def export_array_to_jsonl(array, file_path, include_metadata=False):
     """
-    Export a NumPy array to a .jsonl file.
+    Export a NumPy array to a .jsonl file in chunks of 10,000 lines.
 
     Parameters:
         array (numpy.ndarray): The NumPy array to export.
@@ -17,16 +22,27 @@ def export_array_to_jsonl(array, file_path, include_metadata=False):
         include_metadata (bool): Whether to include metadata for each row. Default is False.
     """
     with open(file_path, 'w') as f:
+        buffer = []
         for i, row in enumerate(array):
+            if i % 10000 == 0 and i > 0:
+                # Write the buffer to the file and clear it
+                f.write('\n'.join(buffer) + '\n')
+                buffer = []
+                print(f"Processed {i} rows...")
+            
             if include_metadata:
                 # Create a dictionary with metadata
                 json_object = {"id": i, "values": row.tolist()}
             else:
                 # Use plain list format
                 json_object = row.tolist()
-            # Write JSON object to file
-            json.dump(json_object, f)
-            f.write('\n')  # Add a newline after each JSON object
+                
+            # Append JSON object as a string to the buffer
+            buffer.append(json.dumps(json_object))
+        
+        # Write any remaining data in the buffer
+        if buffer:
+            f.write('\n'.join(buffer) + '\n')
 
     print(f"Array exported to {file_path}")
 
@@ -43,6 +59,37 @@ def fvecs_read(filename, dtype=np.float32, c_contiguous=True):
     if c_contiguous:
         fv = fv.copy()
     return fv
+
+def new_queries_random():
+    new_queries = np.random.rand(19000, 960)
+    return new_queries
+
+def new_queries_repeated(queries):
+    new_queries = np.tile(queries, (19, 1))
+    return new_queries
+
+def new_queries_base_random(base):
+    new_queries = base[np.random.choice(base.shape[0], size=19000, replace=False)]
+    return new_queries
+
+def modify_vectors(arr, num_changes=5):
+    modified_arr = arr.copy()  # Create a copy to modify
+    for vector in modified_arr:
+        # Randomly select indices
+        indices = np.random.choice(vector.shape[0], size=num_changes, replace=False)
+        # Modify the selected elements by a random percentage between 0% and 1%
+        vector[indices] += vector[indices] * np.random.uniform(-0.01, 0.01, size=num_changes)
+    return modified_arr
+
+def new_queries_shifted(queries):
+    result = []
+    for _ in range(19):
+        modified_vectors = modify_vectors(queries)  # Modify the original array
+        result.append(modified_vectors)         # Append the modified vectors
+
+    # Combine all iterations into a single array
+    final_result = np.vstack(result)
+    return final_result
 
 base = fvecs_read('./gist/gist_base.fvecs')
 print("Base shape", base.shape)
@@ -61,7 +108,10 @@ dimension = base.shape[1]  # Assumes emb_list is a 2D array (num_embeddings, emb
 print("dimension", dimension)
 # Create a FAISS index, here we're using an IndexFlatL2 which is a basic index with L2 distance
 
-new_queries = np.random.rand(190, 960)
+#new_queries = new_queries_random()
+#new_queries = new_queries_repeated(query)
+#new_queries = new_queries_base_random(base)
+new_queries = new_queries_shifted(query)
 print("new_queries shape", new_queries.shape)
 #print("new_queries", new_queries[0])
 
@@ -105,7 +155,7 @@ print("indices", indices.shape)
 
 #compare indices with groundtruth
 
-for i in range(len(indices)):
+for i in range(1000):
     count = 0
     for j in range(len(indices[i])):
         if indices[i][j] in groundtruth[i]:
@@ -117,8 +167,8 @@ for i in range(len(indices)):
         #print("groundtruth", groundtruth[i])
 
 
-export_array_to_jsonl(indices, 'neighbours.jsonl', include_metadata=False)
+export_array_to_jsonl(indices, f'/mydata/{NAME}/neighbours.jsonl', include_metadata=False)
 #export_array_to_jsonl(distances, 'distances.jsonl', include_metadata=False)
-export_array_to_jsonl(query, 'queries.jsonl', include_metadata=False)
-export_array_to_jsonl(base, 'vectors.jsonl', include_metadata=False)
+export_array_to_jsonl(query, f'/mydata/{NAME}/queries.jsonl', include_metadata=False)
+export_array_to_jsonl(base, f'/mydata/{NAME}/vectors.jsonl', include_metadata=False)
         
