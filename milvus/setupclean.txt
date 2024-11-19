@@ -35,3 +35,12 @@ https://artifacthub.io/packages/helm/milvus/milvus
 
 For docker GPU:
 install nvidia driver 550, nvidia container toolkit, nvidia container runtime
+
+wget https://github.com/milvus-io/milvus/releases/download/v2.4.15/milvus-standalone-docker-compose-gpu.yml -O docker-compose.yml
+sudo docker compose up -d
+sudo docker compose ps
+
+to shut down:
+sudo docker compose down
+sudo rm -rf volumes
+
