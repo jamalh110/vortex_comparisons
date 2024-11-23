@@ -1,3 +1,10 @@
+notes:
+Set gpu memory higher
+Docker compose down resets it
+Set proxy task queue higher
+
+
+
 For k8:
 
 for gpu:
