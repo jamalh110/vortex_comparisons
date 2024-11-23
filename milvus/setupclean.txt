@@ -10,7 +10,9 @@ For k8:
 for gpu:
 install nvidia driver 550, nvidia container toolkit, nvidia container runtime
 https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
-sudo apt-get install -y nvidia-container-runtime cuda-drivers-fabricmanager-550 nvidia-headless-550-server
+sudo apt-get install -y nvidia-container-runtime cuda-drivers-fabricmanager-550 (can add nvidia-headless-550-server or other driver if driver not installed)
+sudo reboot
+
 
 
 on master node:
