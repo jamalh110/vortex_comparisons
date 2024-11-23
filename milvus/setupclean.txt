@@ -49,7 +49,7 @@ On master node:
 sudo kubectl get sc
 sudo ~/bin/helm repo add milvus https://zilliztech.github.io/milvus-helm/
 sudo ~/bin/helm repo update
-sudo ~/bin/helm install my-release milvus/milvus
+sudo ~/bin/helm install my-release milvus/milvus --version 4.2.19
 check this until all pods are running and ready:
 sudo kubectl get pods
 
