@@ -18,7 +18,7 @@ sudo reboot
 on master node:
 curl -sfL https://get.k3s.io | sh -
 for GPU:
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server" sh -s - --default-runtime nvidia
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server" sh -s - --default-runtime nvidia --node-ip <nodeip>
 
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
@@ -43,7 +43,7 @@ get token via: sudo cat /var/lib/rancher/k3s/server/node-token
 on each worker node:
 curl -sfL https://get.k3s.io | K3S_URL=<ip>:6443 K3S_TOKEN=mynodetoken sh -
 for GPU:
-curl -sfL https://get.k3s.io | K3S_URL=https://<ip>:6443 K3S_TOKEN=token sh -s - --default-runtime nvidia
+curl -sfL https://get.k3s.io | K3S_URL=https://<ip>:6443 K3S_TOKEN=token sh -s - --default-runtime nvidia --node-ip <nodeip>
 
 On master node:
 sudo kubectl get sc
