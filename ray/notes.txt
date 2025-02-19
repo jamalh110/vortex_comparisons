@@ -1,0 +1,1 @@
+https://docs.ray.io/en/latest/serve/tutorials/gradio-integration.html#parallelize-using-ray-serve
