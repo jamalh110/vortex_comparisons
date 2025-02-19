@@ -35,6 +35,11 @@ def build_ivf_index(cluster_embeddings, nlist=10):
 
     return index
 
+def load_index(index_file):
+    index = faiss.read_index(index_file)
+    gpu_res = faiss.StandardGpuResources()
+    index = faiss.index_cpu_to_gpu(gpu_res, 0, index)
+    
 embs = load_cluster_embeddings2("/mydata/msmarco_3_clusters")
 index = build_ivf_index(embs)
 
