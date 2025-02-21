@@ -9,16 +9,17 @@ sudo wget https://vortexstorage7348269.blob.core.windows.net/msmarco/msmarco_3_c
 sudo tar -xzvf msmarco_3_clusters.tar.gz
 pip install ray[serve]
 faiss install script
+pip install -r requirements.txt
 
 
 on the head node:
 ray metrics launch-prometheus
 run grafana: https://docs.ray.io/en/latest/cluster/metrics.html#simplest-setting-up-grafana-with-ray-provided-configurations
-sudo /users/jamalh11/.local/bin/ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.1x
+sudo /users/jamalh11/.local/bin/ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.x
 
 
-on worker nodes:
-sudo /users/jamalh11/.local/bin/ray start --address 10.10.1.10:6379 --node-ip-address 10.10.1.x
+on worker nodes (address is head node address):
+sudo /users/jamalh11/.local/bin/ray start --address 10.10.1.x:6379 --node-ip-address 10.10.1.x
 
 
 on head node:
@@ -28,7 +29,7 @@ serve deploy serve_config.yaml
 
 on benchmark node:
 pip install locust
-locust -f locustfile.py --users 2 --spawn-rate 2 --headless -H http://10.10.1.10:8000
+locust -f locustfile.py --users 2 --spawn-rate 2 --headless -H http://10.10.1.x:8000
 
 
 to stop:
