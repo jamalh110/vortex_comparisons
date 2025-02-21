@@ -7,6 +7,7 @@ cd /mydata
 sudo wget https://vortexstorage7348269.blob.core.windows.net/msmarco/msmarco.index;
 sudo wget https://vortexstorage7348269.blob.core.windows.net/msmarco/msmarco_3_clusters.tar.gz;
 sudo tar -xzvf msmarco_3_clusters.tar.gz
+
 pip install ray[serve]
 faiss install script
 pip install -r requirements.txt
