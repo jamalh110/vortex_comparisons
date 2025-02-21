@@ -55,18 +55,18 @@ applications:
           search_type: "cpu"
 
   - name: DocGen
-    num_replicas: 8
+    num_replicas: 14
     max_ongoing_requests: 1
     ray_actor_options:
       num_cpus: 1.0
       num_gpus: 0.18
 
   - name: TTS
-    num_replicas: 14
+    num_replicas: 20
     max_ongoing_requests: 1
     ray_actor_options:
       num_cpus: 1.0
-      num_gpus: 0.07
+      num_gpus: 0.06
 
   - name: TextCheck
     max_ongoing_requests: 32
