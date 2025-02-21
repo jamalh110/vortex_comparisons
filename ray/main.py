@@ -131,7 +131,7 @@ class DocGen:
         self.terminators = None
         self.doc_data = None
 
-        login(token="<access_token>")
+        #login(token="<access_token>")
         self.load_llm()
 
     def load_llm(self,):
