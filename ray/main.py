@@ -5,6 +5,7 @@ from ray import serve
 import requests
 from starlette.requests import Request
 from ray.serve.handle import DeploymentHandle
+from ray.serve import Application
 from FlagEmbedding import BGEM3FlagModel, FlagModel
 import numpy as np
 from typing import Any, Dict, List
@@ -57,7 +58,11 @@ class Search:
         self.index_type = index_type
         self.nprobe = nprobe
         self.index = None
-        self.load_index("/mydata/msmarco.index")
+        hardware = os.getenv("search_type", "cpu")
+        if(hardware == "gpu"):
+            self.load_index("/mydata/msmarco.index")
+        else:
+            self.load_index_cpu("/mydata/msmarco.index")
         #self.load_cluster_embeddings2(cluster_dir)
         #print("\n\n\n\n", "embeddings shape",self.cluster_embeddings.shape, "\n\n\n\n")
         #self.build_ivf_index()
@@ -105,6 +110,9 @@ class Search:
         self.index = faiss.read_index(index_file)
         gpu_res = faiss.StandardGpuResources()
         self.index = faiss.index_cpu_to_gpu(gpu_res, 0, self.index)
+
+    def load_index_cpu(self, index_file):
+        self.index = faiss.read_index(index_file)
 
     #TODO: find a faster way to do the return here
     def run(self, query_list: Any, top_k=5):
@@ -331,12 +339,14 @@ class Ingress:
 
         return {"tts": tts_result, "textcheck": await textcheck_result}
 
-encoder = Encoder.bind()
-search = Search.bind()
-docgen = DocGen.bind()
-tts = TTS.bind()
-textcheck = TextCheck.bind()
-app = Ingress.bind(encoder=encoder, search=search, docgen=docgen, tts=tts, textcheck=textcheck)
+
+def app(args: Dict[str, str]) -> Application:
+    encoder = Encoder.bind()
+    search = Search.bind()
+    docgen = DocGen.bind()
+    tts = TTS.bind()
+    textcheck = TextCheck.bind()
+    return Ingress.bind(encoder=encoder, search=search, docgen=docgen, tts=tts, textcheck=textcheck)
 
 #handle: DeploymentHandle = serve.run(app)
 
