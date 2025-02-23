@@ -1,0 +1,30 @@
+sudo apt-get install git-lfs
+git lfs install
+cd /mydata
+sudo git clone https://huggingface.co/LinWeizheDragon/PreFLMR_ViT-L
+sudo git clone https://huggingface.co/openai/clip-vit-large-patch14
+
+cd pipeline1
+git clone https://github.com/LinWeizheDragon/FLMR.git
+sudo pip uninstall torch torchvision torchaudio
+sudo pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+pip uninstall faiss
+sudo ./faiss.sh
+
+cd FLMR
+pip install -e .
+
+cd third_party/ColBERT
+pip install -e .
+
+
+pip install ujson gitpython easydict ninja datasets transformers
+
+
+sudo ./download_evqa.sh
+(do the inat zip fix)
+
+
+Try this to fix random hanging process issue:
+RAY_kill_child_processes_on_worker_exit_with_raylet_subreaper=true
