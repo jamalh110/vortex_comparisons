@@ -124,6 +124,7 @@ class StepA:
         }
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, inputs: List[Dict[str, Any]]):
+        print("BATCH SIZE: ",len(inputs))
         #time.sleep(10)
         output = self.stepA_output(inputs)
         text_embeddings = output['text_embeddings'].cpu()
@@ -197,7 +198,7 @@ class StepB:
             encoded = self.image_processor(image, return_tensors="pt")
             pixel_values.append(encoded.pixel_values)
         pixel_values = torch.stack(pixel_values, dim=0)
-            
+        print("here1")
         batch_size = pixel_values.shape[0]
         # Forward the vision encoder
         pixel_values = pixel_values.to(self.device)
@@ -207,6 +208,7 @@ class StepB:
             pixel_values = pixel_values.reshape(
                 -1, pixel_values.shape[2], pixel_values.shape[3], pixel_values.shape[4]
             )
+        print("here2")
         vision_encoder_outputs = self.query_vision_encoder(pixel_values, output_hidden_states=True)
         vision_embeddings = vision_encoder_outputs.last_hidden_state[:, 0]
         
@@ -219,6 +221,7 @@ class StepB:
     
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, list_of_images: List[str]):
+        print("BATCH SIZE: ",len(list_of_images))
         #time.sleep(10)
         output = self.StepB_output(list_of_images)
         vision_embeddings = output['vision_embeddings'].cpu()
@@ -229,6 +232,7 @@ class StepB:
                 "vision_embeddings": vision_embeddings[i],
                 "vision_second_last_layer_hidden_states": vision_second_last_layer_hidden_states[i]
             })
+        print("done")
         return results
         #return self.StepB_output(list_of_images)
 
@@ -267,6 +271,7 @@ class StepC:
     
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, input: List[Dict[str, Any]]):
+        print("BATCH SIZE: ",len(input))
         vision_second_last_layer_hidden_states = []
         for i in input:
             vision_second_last_layer_hidden_states.append(i['vision_second_last_layer_hidden_states'])
@@ -298,28 +303,31 @@ class StepE:
         )
 
     def process_search(self, queries, query_embeddings, bsize):
-        if self.searcher == None:
-            self.load_searcher_gpu()
-            
         ranking = search_custom_collection(
             searcher=self.searcher,
             queries=queries,
-            query_embeddings=torch.Tensor(query_embeddings),
+            #query_embeddings=torch.Tensor(query_embeddings),
+            query_embeddings=query_embeddings,
             num_document_to_retrieve=5, # how many documents to retrieve for each query
             centroid_search_batch_size=bsize,
         )
         return ranking.todict()
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, input: List[Dict[str, Any]]):
-        bsize = len(input)
+        #bsize = len(input)
+        print("BATCH SIZE: ",len(input))
+        bsize = 32
         queries = {}
         query_embeddings_list = []
         for i in input:
             queries[i['question_id']] = i['question']
             query_embeddings_list.append(i['query_embeddings'])
 
-        query_embeddings = torch.stack(query_embeddings_list, dim=0)
+        query_embeddings = torch.stack(query_embeddings_list, dim=0).cuda()
+
+        tim = time.time()
         output = self.process_search(queries, query_embeddings, bsize)
+        print(f"Search took {time.time() - tim} seconds")
 
         ret = []
         for i in input:
@@ -338,13 +346,19 @@ class Ingress:
         self.stepE = stepE
 
     async def __call__(self, http_request: Request):
+        print("here1")
         input = await http_request.json()
+        print("here2")
         #image = input['imagebytes']
         #del input['imagebytes']
         image = input['img_path']
+        print("here3")
         stepA_output = self.stepA.remote(input)
+        print("here4")
         stepB_output = self.stepB.remote(image)
+        print("here5")
         stepC_output = self.stepC.remote(stepB_output)
+        print("here6")
         output_a_raw = await stepA_output
         output_b_raw = await stepB_output
         output_c_raw = await stepC_output
