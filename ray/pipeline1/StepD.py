@@ -159,6 +159,7 @@ class StepD:
     
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, inputs: List[Dict[str, Any]]):
+        print("BATCH SIZE: ",len(inputs))
         #print("stepD inputs\n\n\n", inputs[0]['input_ids'])
         input_ids = torch.stack([x["input_ids"] for x in inputs], dim=0).cuda()
         text_embeddings = torch.stack([x["text_embeddings"] for x in inputs], dim=0).cuda()
