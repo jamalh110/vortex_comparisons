@@ -29,30 +29,34 @@ p_ds_dir = "/mydata/EVQA/EVQA_passages/EVQA_passages"
 ds = load_dataset('parquet', data_files ={  
                                             'train' : ds_dir + '/train-00000-of-00001.parquet',
                                             'test'  : ds_dir + '/test-00000-of-00001-2.parquet',
-                                            })[use_split].select(i for i in range(999))
+                                            })[use_split]
 
 
 ds = ds.map(add_path_prefix_in_img_path, fn_kwargs={"prefix": image_root_dir})
+print("DS LEN", len(ds))
 #ds = ds.map(process_image)
 
 print(ds[0])
 #print(ds['question_id'])
 #exit(0)
-nqueries = 100
+nqueries = 500
 max_retries = 3
 answers = []
 for i in range(nqueries):
     data = ds[i]
     for attempt in range(1, max_retries + 1):
         try:
-            response = requests.post("http://127.0.0.1:8000/", json=data)
+            response = requests.post("http://10.10.1.10:8000/", json=data)
             response.raise_for_status()  # Raise an exception for HTTP error codes
             output = response.json()
+            if(output[0] == "error"):
+                print("Error in query", i)
+                raise Exception("Error in query")
             print(output)
-            print("Request took", response.elapsed.total_seconds(), "seconds")
+            print("Request",i,"took", response.elapsed.total_seconds(), "seconds")
             answers.append(output)
             break  # Exit the retry loop if the request was successful
-        except (requests.RequestException, json.JSONDecodeError) as e:
+        except (requests.RequestException, json.JSONDecodeError, Exception) as e:
             print(f"Attempt {attempt} failed for query {i}: {e}")
             if attempt == max_retries:
                 print("Max retries reached for query", i)
@@ -60,6 +64,7 @@ for i in range(nqueries):
             else:
                 # Optionally add a delay before retrying
                 time.sleep(1)
+    #time.sleep(1)  
 
 passages_ds = load_dataset('parquet', data_files ={  
                                             'train' : p_ds_dir + '/train_passages-00000-of-00001.parquet',

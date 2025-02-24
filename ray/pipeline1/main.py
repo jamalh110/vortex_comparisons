@@ -1,9 +1,12 @@
+import asyncio
 import time
 from ray import serve
 import json
+import ray
 from starlette.requests import Request
 from ray.serve.handle import DeploymentHandle
 from ray.serve import Application
+from ray.serve.schema import LoggingConfig
 from typing import Any, Dict, List
 import os 
 import torch
@@ -15,6 +18,8 @@ from PIL import Image
 from easydict import EasyDict
 from transformers.models.bert.modeling_bert import BertEncoder
 from StepD import StepD
+import random
+import string
 
 #TODO: Keep tensors in GPU instead of copying them to cpu in __call__ of every step? 
 #TODO: test keeping tensors in gpu across ray returns and see if it is faster
@@ -138,6 +143,7 @@ class StepA:
                 "input_ids": input_ids[i],
                 "text_encoder_hidden_states": text_encoder_hidden_states[i]
             })
+        print("done", inputs[0]['requestid'])
         return results
         #return self.stepA_output(inputs)
 
@@ -220,10 +226,13 @@ class StepB:
         return {"vision_embeddings": vision_embeddings, "vision_second_last_layer_hidden_states": vision_second_last_layer_hidden_states}
     
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
-    async def __call__(self, list_of_images: List[str]):
+    async def __call__(self, list_of_images: List[Dict[str, str]]):
         print("BATCH SIZE: ",len(list_of_images))
         #time.sleep(10)
-        output = self.StepB_output(list_of_images)
+        formatted = []
+        for i in list_of_images:
+            formatted.append(i['image_path'])
+        output = self.StepB_output(formatted)
         vision_embeddings = output['vision_embeddings'].cpu()
         vision_second_last_layer_hidden_states = output['vision_second_last_layer_hidden_states'].cpu()
         results = []
@@ -232,7 +241,7 @@ class StepB:
                 "vision_embeddings": vision_embeddings[i],
                 "vision_second_last_layer_hidden_states": vision_second_last_layer_hidden_states[i]
             })
-        print("done")
+        print("done", list_of_images[0]['requestid'])
         return results
         #return self.StepB_output(list_of_images)
 
@@ -282,6 +291,7 @@ class StepC:
         ret = []
         for i in range(output.shape[0]):
             ret.append({"transformer_mapping_input_features": output[i]})
+        print("done", input[0]['requestid'])
         return ret
 
 @serve.deployment
@@ -336,6 +346,7 @@ class StepE:
         return ret
 
 
+#TODO: pass in a request ID to make sure things are actually being called
 @serve.deployment
 class Ingress:
     def __init__(self, stepA: DeploymentHandle, stepB: DeploymentHandle, stepC: DeploymentHandle, stepD: DeploymentHandle, stepE: DeploymentHandle):
@@ -346,43 +357,58 @@ class Ingress:
         self.stepE = stepE
 
     async def __call__(self, http_request: Request):
-        print("here1")
-        input = await http_request.json()
-        print("here2")
-        #image = input['imagebytes']
-        #del input['imagebytes']
-        image = input['img_path']
-        print("here3")
-        stepA_output = self.stepA.remote(input)
-        print("here4")
-        stepB_output = self.stepB.remote(image)
-        print("here5")
-        stepC_output = self.stepC.remote(stepB_output)
-        print("here6")
-        output_a_raw = await stepA_output
-        output_b_raw = await stepB_output
-        output_c_raw = await stepC_output
-        #TODO: test if passing in the objectrefs is faster than awaitng and sending
+        try:
+            requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+            print(requestid)
+            print("here1")
+            input = await http_request.json()
+            input['requestid'] = requestid
+            print("here2")
+            #image = input['imagebytes']
+            #del input['imagebytes']
+            image = {"image_path": input['img_path']}
+            image['requestid'] = requestid
+            print("here3")
+            stepA_output = self.stepA.remote(input)
+            print("here4")
+            print(image)
+            stepB_output = self.stepB.remote(image)
+            print("here5")
+            output_b_raw = await asyncio.wait_for(stepB_output, timeout=10)
+            output_b_raw['requestid'] = requestid
+            stepC_output = self.stepC.remote(output_b_raw)
+            #stepC_output = self.stepC.remote(stepB_output)
+            print("here6") 
+            output_a_raw = await asyncio.wait_for(stepA_output, timeout=10)
+            print("here7")
+            
+            print("here8")
+            output_c_raw = await asyncio.wait_for(stepC_output, timeout=10)
+            #TODO: test if passing in the objectrefs is faster than awaitng and sending
 
-        print(f"output_c_raw shape is : {output_c_raw['transformer_mapping_input_features'].shape}")
-        print(f"vision_embedding shape is : {output_b_raw['vision_embeddings'].shape} | vision penultimate shape is: {output_b_raw['vision_second_last_layer_hidden_states'].shape}")
-        print(f"text_embedding shape is : {output_a_raw['text_embeddings'].shape} | text encoder hidden shape is: {output_a_raw['text_encoder_hidden_states'].shape} | input_ids shape is: {output_a_raw['input_ids'].shape}")
+            print(f"output_c_raw shape is : {output_c_raw['transformer_mapping_input_features'].shape}")
+            print(f"vision_embedding shape is : {output_b_raw['vision_embeddings'].shape} | vision penultimate shape is: {output_b_raw['vision_second_last_layer_hidden_states'].shape}")
+            print(f"text_embedding shape is : {output_a_raw['text_embeddings'].shape} | text encoder hidden shape is: {output_a_raw['text_encoder_hidden_states'].shape} | input_ids shape is: {output_a_raw['input_ids'].shape}")
 
-        stepD_output = self.stepD.remote({
-            "input_ids": output_a_raw['input_ids'],
-            "text_embeddings": output_a_raw['text_embeddings'],
-            "text_encoder_hidden_states": output_a_raw['text_encoder_hidden_states'],
-            "vision_embeddings": output_b_raw['vision_embeddings'],
-            "transformer_mapping_input_features": output_c_raw['transformer_mapping_input_features']
-        })
-        output_d_raw = await stepD_output
-        print(f"output_d_raw shape is : {output_d_raw.shape}")
-        #output = {key: tensor.cpu().tolist() for key, tensor in output_raw.items()}
-        stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['question'], "query_embeddings": output_d_raw})
-        #output = "Success"
-        output = await stepE_output
-        print("STEP E OPUTPUT", output)
-        return output
+            stepD_output = self.stepD.remote({
+                "input_ids": output_a_raw['input_ids'],
+                "text_embeddings": output_a_raw['text_embeddings'],
+                "text_encoder_hidden_states": output_a_raw['text_encoder_hidden_states'],
+                "vision_embeddings": output_b_raw['vision_embeddings'],
+                "transformer_mapping_input_features": output_c_raw['transformer_mapping_input_features'],
+                'requestid': requestid
+            })
+            output_d_raw = await asyncio.wait_for(stepD_output, timeout=10)
+            print(f"output_d_raw shape is : {output_d_raw.shape}")
+            #output = {key: tensor.cpu().tolist() for key, tensor in output_raw.items()}
+            stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['question'], "query_embeddings": output_d_raw})
+            #output = "Success"
+            output = await asyncio.wait_for(stepE_output, timeout=10)
+            print("STEP E OPUTPUT", output)
+            return output
+        except Exception as e:
+            print(e)
+            return ["error"]
 
 
 # stepA = StepA.bind()
