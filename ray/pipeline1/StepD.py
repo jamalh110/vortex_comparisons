@@ -168,4 +168,5 @@ class StepD:
         transformer_mapping_input_features = torch.stack([x["transformer_mapping_input_features"] for x in inputs], dim=0).cuda()
         print("stepD shape\n\n\n", text_embeddings.shape, vision_embeddings.shape, transformer_mapping_input_features.shape)
         query_embeddings = self.proces_queries(input_ids, text_embeddings, text_encoder_hidden_states, vision_embeddings, transformer_mapping_input_features).cpu()
+        print("requestid", inputs[0]['requestid'])
         return query_embeddings
