@@ -14,7 +14,7 @@ cd /mydata
 sudo git clone https://huggingface.co/LinWeizheDragon/PreFLMR_ViT-L
 sudo git clone https://huggingface.co/openai/clip-vit-large-patch14
 
-cd pipeline1
+cd ~/vortex_comparisons/ray/pipeline1
 git clone https://github.com/LinWeizheDragon/FLMR.git
 sudo pip uninstall torch torchvision torchaudio
 sudo pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
@@ -29,14 +29,20 @@ cd third_party/ColBERT
 pip install -e .
 
 
-pip install ujson gitpython easydict ninja datasets transformers
+pip install ujson gitpython easydict datasets transformers pillow easydict ninja
+pip uninstall ninja
+sudo pip install ninja
 
+pip uninstall numpy
+pip install numpy==1.26.4
 
 sudo ./download_evqa.sh
 do the inat zip fix:
 
-zip -FFv inat.zip --out fixed.zip
-unzip fixed.zip -d inat/
+cd /mydata/EVQA
+sudo apt install zip
+sudo zip -FFv inat.zip --out fixed.zip
+sudo unzip fixed.zip -d inat/
 
 
 IF STEP E FREEZES ON __INIT__ loading torch extension:
@@ -45,5 +51,11 @@ remmove the lock file:
 cd /home/jah649/.cache/torch_extensions/py310_cu118/<problematic_extension>
 rm lock
 
+
+LOCUST:
+sudo /users/jamalh11/.local/bin/locust -f locustfile.py --users 1 --spawn-rate 2 --headless -H http://10.10.1.4:8000
+
 Try this to fix random hanging process issue:
 RAY_kill_child_processes_on_worker_exit_with_raylet_subreaper=true
+
+

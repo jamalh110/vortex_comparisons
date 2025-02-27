@@ -5,7 +5,7 @@ from datasets import load_dataset
 import os 
 from PIL import Image
 
-DATA_DIR = "/home/jah649/mydata"
+DATA_DIR = "/mydata"
 def add_path_prefix_in_img_path(example, prefix):
     if example["img_path"] != None:
         example["img_path"] = os.path.join(prefix, example["img_path"])
@@ -50,6 +50,7 @@ onecall()
 nqueries = 500
 max_retries = 3
 answers = []
+totaltimestart = time.time()
 for i in range(nqueries):
     data = ds[i]
     for attempt in range(1, max_retries + 1):
@@ -73,7 +74,7 @@ for i in range(nqueries):
                 # Optionally add a delay before retrying
                 time.sleep(1)
     #time.sleep(10)  
-
+print("TOTAL TIME:", time.time()-totaltimestart)
 passages_ds = load_dataset('parquet', data_files ={  
                                             'train' : p_ds_dir + '/train_passages-00000-of-00001.parquet',
                                             'test'  : p_ds_dir + '/test_passages-00000-of-00001.parquet',

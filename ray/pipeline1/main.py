@@ -32,7 +32,7 @@ import pickle
 #TODO: test calling step c from step b and see if it is faster
 #TODO: test if batch works properly
 _MAX_BATCH_SIZE = 32
-DATA_DIR="/home/jah649/mydata"
+DATA_DIR="/mydata"
 
 _print=print
 def print(*args, **kw):
