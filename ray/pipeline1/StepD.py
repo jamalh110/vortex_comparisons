@@ -64,7 +64,7 @@ class StepD:
         self.transformer_mapping_output_linear.cuda()
 
     def mask(self, input_ids, skiplist):
-        return [[(x not in skiplist) and (x != 0) for x in d] for d in input_ids.cpu().tolist()]
+        return [[(x not in skiplist) and (x != 0) for x in d] for d in input_ids.detach().cpu().tolist()]
     
     
     def query_mask(self, input_ids, skiplist):
@@ -84,7 +84,7 @@ class StepD:
                 (x not in skiplist) and (x != 0) and (index > sep_positions[seq_index] or index < 2)
                 for index, x in enumerate(d)
             ]
-            for seq_index, d in enumerate(input_ids.cpu().tolist())
+            for seq_index, d in enumerate(input_ids.detach().cpu().tolist())
         ]
         return mask
         
@@ -162,12 +162,12 @@ class StepD:
     async def __call__(self, inputs: List[Dict[str, Any]]):
         #print("BATCH SIZE: ",len(inputs))
         #print("stepD inputs\n\n\n", inputs[0]['input_ids'])
-        input_ids = torch.stack([x["input_ids"] for x in inputs], dim=0).cuda()
-        text_embeddings = torch.stack([x["text_embeddings"] for x in inputs], dim=0).cuda()
-        text_encoder_hidden_states = torch.stack([x["text_encoder_hidden_states"] for x in inputs], dim=0).cuda()
-        vision_embeddings = torch.stack([x["vision_embeddings"] for x in inputs], dim=0).cuda()
-        transformer_mapping_input_features = torch.stack([x["transformer_mapping_input_features"] for x in inputs], dim=0).cuda()
+        input_ids = torch.stack([torch.from_numpy(x["input_ids"]) for x in inputs], dim=0).cuda()
+        text_embeddings = torch.stack([torch.from_numpy(x["text_embeddings"]) for x in inputs], dim=0).cuda()
+        text_encoder_hidden_states = torch.stack([torch.from_numpy(x["text_encoder_hidden_states"]) for x in inputs], dim=0).cuda()
+        vision_embeddings = torch.stack([torch.from_numpy(x["vision_embeddings"]) for x in inputs], dim=0).cuda()
+        transformer_mapping_input_features = torch.stack([torch.from_numpy(x["transformer_mapping_input_features"]) for x in inputs], dim=0).cuda()
         #print("stepD shape\n\n\n", text_embeddings.shape, vision_embeddings.shape, transformer_mapping_input_features.shape)
-        query_embeddings = self.proces_queries(input_ids, text_embeddings, text_encoder_hidden_states, vision_embeddings, transformer_mapping_input_features).cpu()
-        #print("requestid", inputs[0]['requestid'])
+        query_embeddings = self.proces_queries(input_ids, text_embeddings, text_encoder_hidden_states, vision_embeddings, transformer_mapping_input_features).detach().cpu().numpy()
+        print("done", inputs[0]['requestid'])
         return query_embeddings

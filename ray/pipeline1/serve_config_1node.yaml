@@ -41,36 +41,36 @@ applications:
   deployments:
 
   - name: StepA
-    num_replicas: 4
+    num_replicas: 1
     max_ongoing_requests: 32
     ray_actor_options:
       num_cpus: 1.0
       num_gpus: 0.04
       
   - name: StepB
-    num_replicas: 4
+    num_replicas: 1
     max_ongoing_requests: 32
     ray_actor_options:
       num_cpus: 1.0
       num_gpus: 0.1
 
   - name: StepC
-    num_replicas: 4
+    num_replicas: 1
     max_ongoing_requests: 32
     ray_actor_options:
       num_cpus: 1.0
       num_gpus: 0.015
 
   - name: StepD
-    num_replicas: 4
+    num_replicas: 1
     max_ongoing_requests: 32
     ray_actor_options:
       num_cpus: 1.0
       num_gpus: 0.02
 
   - name: StepE
-    num_replicas: 4
-    max_ongoing_requests: 32
+    num_replicas: 1
+    max_ongoing_requests: 64
     ray_actor_options:
       num_cpus: 4.0
       num_gpus: 0.04
@@ -79,7 +79,7 @@ applications:
             COLBERT_LOAD_TORCH_EXTENSION_VERBOSE: "True"
 
   - name: Ingress
-    num_replicas: 4
+    num_replicas: 1
     max_ongoing_requests: 100
     ray_actor_options:
       num_cpus: 1.0

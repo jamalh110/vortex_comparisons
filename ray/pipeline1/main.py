@@ -34,14 +34,6 @@ import pickle
 _MAX_BATCH_SIZE = 32
 DATA_DIR="/mydata"
 
-_print=print
-def print(*args, **kw):
-    #_print("[%s]" % (datetime.now()),*args, **kw, flush=False)
-    _print(*args, **kw)
-
-def randomfunction(randomarg, randomarg2):
-    print("random", randomarg)
-
 @serve.deployment
 class StepA:
     def __init__(self):
@@ -146,9 +138,9 @@ class StepA:
         #print("BATCH SIZE: ",len(inputs))
         #time.sleep(10)
         output = self.stepA_output(inputs)
-        text_embeddings = output['text_embeddings'].cpu()
-        input_ids = output['input_ids'].cpu()
-        text_encoder_hidden_states = output['text_encoder_hidden_states'].cpu()
+        text_embeddings = output['text_embeddings'].detach().cpu().numpy()
+        input_ids = output['input_ids'].detach().cpu().numpy()
+        text_encoder_hidden_states = output['text_encoder_hidden_states'].detach().cpu().numpy()
 
         results = []
         for i in range(text_embeddings.shape[0]):
@@ -157,7 +149,7 @@ class StepA:
                 "input_ids": input_ids[i],
                 "text_encoder_hidden_states": text_encoder_hidden_states[i]
             })
-        #print("done", inputs[0]['requestid'])
+        print("done", inputs[0]['requestid'])
         return results
         #return self.stepA_output(inputs)
 
@@ -247,15 +239,15 @@ class StepB:
         for i in list_of_images:
             formatted.append(i['image_path'])
         output = self.StepB_output(formatted)
-        vision_embeddings = output['vision_embeddings'].cpu()
-        vision_second_last_layer_hidden_states = output['vision_second_last_layer_hidden_states'].cpu()
+        vision_embeddings = output['vision_embeddings'].detach().cpu().numpy()
+        vision_second_last_layer_hidden_states = output['vision_second_last_layer_hidden_states'].detach().cpu().numpy()
         results = []
         for i in range(vision_embeddings.shape[0]):
             results.append({
                 "vision_embeddings": vision_embeddings[i],
                 "vision_second_last_layer_hidden_states": vision_second_last_layer_hidden_states[i]
             })
-        #print("done", list_of_images[0]['requestid'])
+        print("done", list_of_images[0]['requestid'])
         return results
         #return self.StepB_output(list_of_images)
 
@@ -297,15 +289,15 @@ class StepC:
         #print("BATCH SIZE: ",len(input))
         vision_second_last_layer_hidden_states = []
         for i in input:
-            vision_second_last_layer_hidden_states.append(i['vision_second_last_layer_hidden_states'])
+            vision_second_last_layer_hidden_states.append(torch.from_numpy(i['vision_second_last_layer_hidden_states']))
         combined_tensor = torch.stack(vision_second_last_layer_hidden_states, dim=0)
-        output = self.stepC_output(combined_tensor.cuda()).cpu()
+        output = self.stepC_output(combined_tensor.cuda()).detach().cpu().numpy()
         #list_of_tensors = list(output.unbind(dim=0))
         #return list_of_tensors
         ret = []
         for i in range(output.shape[0]):
             ret.append({"transformer_mapping_input_features": output[i]})
-        #print("done", input[0]['requestid'])
+        print("done", input[0]['requestid'])
         return ret
 
 @serve.deployment
@@ -345,7 +337,7 @@ class StepE:
         query_embeddings_list = []
         for i in input:
             queries[i['question_id']] = i['question']
-            query_embeddings_list.append(i['query_embeddings'])
+            query_embeddings_list.append(torch.from_numpy(i['query_embeddings']))
 
         query_embeddings = torch.stack(query_embeddings_list, dim=0).cuda()
 
@@ -357,6 +349,7 @@ class StepE:
         for i in input:
             ret.append(output[i['question_id']])
 
+        print("done", input[0]['requestid'])
         return ret
 
 
@@ -380,6 +373,7 @@ class Ingress:
     async def __call__(self, http_request: Request):
         try:
             requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+            print("requestid", requestid)
             input = await http_request.json()
             input['requestid'] = requestid
 
@@ -405,7 +399,7 @@ class Ingress:
             })
 
             output_d_raw = await stepD_output
-            stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['question'], "query_embeddings": output_d_raw})
+            stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['question'], "query_embeddings": output_d_raw, "requestid": requestid})
             output = await stepE_output
 
             return output
