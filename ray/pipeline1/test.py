@@ -5,7 +5,7 @@ from datasets import load_dataset
 import os 
 from PIL import Image
 
-
+DATA_DIR = "/home/jah649/mydata"
 def add_path_prefix_in_img_path(example, prefix):
     if example["img_path"] != None:
         example["img_path"] = os.path.join(prefix, example["img_path"])
@@ -21,10 +21,10 @@ def process_image(example):
     return example
     
 
-image_root_dir = "/mydata/EVQA"
+image_root_dir = f"{DATA_DIR}/EVQA"
 use_split = "train"
-ds_dir = "/mydata/EVQA/EVQA_data/EVQA_data"
-p_ds_dir = "/mydata/EVQA/EVQA_passages/EVQA_passages"
+ds_dir = f"{DATA_DIR}/EVQA/EVQA_data/EVQA_data"
+p_ds_dir = f"{DATA_DIR}/EVQA/EVQA_passages/EVQA_passages"
 
 ds = load_dataset('parquet', data_files ={  
                                             'train' : ds_dir + '/train-00000-of-00001.parquet',
@@ -37,6 +37,14 @@ print("DS LEN", len(ds))
 #ds = ds.map(process_image)
 
 print(ds[0])
+
+def onecall():
+    data = ds[0]
+    response = requests.post("http://127.0.0.1:8000/", json=data)
+    output = response.json()
+    print(output)
+onecall()
+#exit(0)
 #print(ds['question_id'])
 #exit(0)
 nqueries = 500
@@ -46,7 +54,7 @@ for i in range(nqueries):
     data = ds[i]
     for attempt in range(1, max_retries + 1):
         try:
-            response = requests.post("http://10.10.1.10:8000/", json=data)
+            response = requests.post("http://127.0.0.1:8000/", json=data)
             response.raise_for_status()  # Raise an exception for HTTP error codes
             output = response.json()
             if(output[0] == "error"):
@@ -64,7 +72,7 @@ for i in range(nqueries):
             else:
                 # Optionally add a delay before retrying
                 time.sleep(1)
-    #time.sleep(1)  
+    #time.sleep(10)  
 
 passages_ds = load_dataset('parquet', data_files ={  
                                             'train' : p_ds_dir + '/train_passages-00000-of-00001.parquet',

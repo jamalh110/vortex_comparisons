@@ -1,6 +1,6 @@
 python prepare_FLMR.py
 
-cd /mydata/
+cd /mydata
 sudo mkdir EVQA
 cd EVQA
 

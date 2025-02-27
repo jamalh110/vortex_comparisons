@@ -69,6 +69,9 @@ applications:
     ray_actor_options:
       num_cpus: 4.0
       num_gpus: 0.5
+      runtime_env:
+          env_vars:
+            COLBERT_LOAD_TORCH_EXTENSION_VERBOSE: "True"
 
   - name: Ingress
     ray_actor_options:

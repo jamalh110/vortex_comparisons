@@ -7,6 +7,7 @@ from torch import Tensor, nn
 import torch
 
 _MAX_BATCH_SIZE = 32
+DATA_DIR="/home/jah649/mydata"
 
 @serve.deployment
 class StepD:
@@ -18,10 +19,10 @@ class StepD:
         self.transformer_mapping_cross_attention_length = 32
         self.vision_encoder_embedding_size = 1024
         self.late_interaction_embedding_size = 128
-        self.checkpoint_path = '/mydata/PreFLMR_ViT-L'
+        self.checkpoint_path = f'{DATA_DIR}/PreFLMR_ViT-L'
         self.transformer_mapping_config_base = 'bert-base-uncased'
-        self.local_tf_mapping_path = '/mydata/EVQA/models/models_step_D_transformer_mapping.pt'
-        self.local_tf_mapping_output_path = '/mydata/EVQA/models/models_step_D_transformer_mapping_output.pt'
+        self.local_tf_mapping_path = f'{DATA_DIR}/EVQA/models/models_step_D_transformer_mapping.pt'
+        self.local_tf_mapping_output_path = f'{DATA_DIR}/EVQA/models/models_step_D_transformer_mapping_output.pt'
         self.transformer_mapping_network = None
         self.transformer_mapping_output_linear = None
         
@@ -159,14 +160,14 @@ class StepD:
     
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, inputs: List[Dict[str, Any]]):
-        print("BATCH SIZE: ",len(inputs))
+        #print("BATCH SIZE: ",len(inputs))
         #print("stepD inputs\n\n\n", inputs[0]['input_ids'])
         input_ids = torch.stack([x["input_ids"] for x in inputs], dim=0).cuda()
         text_embeddings = torch.stack([x["text_embeddings"] for x in inputs], dim=0).cuda()
         text_encoder_hidden_states = torch.stack([x["text_encoder_hidden_states"] for x in inputs], dim=0).cuda()
         vision_embeddings = torch.stack([x["vision_embeddings"] for x in inputs], dim=0).cuda()
         transformer_mapping_input_features = torch.stack([x["transformer_mapping_input_features"] for x in inputs], dim=0).cuda()
-        print("stepD shape\n\n\n", text_embeddings.shape, vision_embeddings.shape, transformer_mapping_input_features.shape)
+        #print("stepD shape\n\n\n", text_embeddings.shape, vision_embeddings.shape, transformer_mapping_input_features.shape)
         query_embeddings = self.proces_queries(input_ids, text_embeddings, text_encoder_hidden_states, vision_embeddings, transformer_mapping_input_features).cpu()
-        print("requestid", inputs[0]['requestid'])
+        #print("requestid", inputs[0]['requestid'])
         return query_embeddings

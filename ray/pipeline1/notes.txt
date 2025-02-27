@@ -1,5 +1,15 @@
 sudo apt-get install git-lfs
 git lfs install
+
+
+on fractus:
+wget https://github.com/git-lfs/git-lfs/releases/download/v3.2.0/git-lfs-linux-amd64-v3.2.0.tar.gz
+tar -xzf git-lfs-linux-amd64-v3.2.0.tar.gz
+PATH=$PATH:/path-to/git-lfs-3.2.0/
+git lfs install
+git lfs version
+
+
 cd /mydata
 sudo git clone https://huggingface.co/LinWeizheDragon/PreFLMR_ViT-L
 sudo git clone https://huggingface.co/openai/clip-vit-large-patch14
@@ -23,8 +33,17 @@ pip install ujson gitpython easydict ninja datasets transformers
 
 
 sudo ./download_evqa.sh
-(do the inat zip fix)
+do the inat zip fix:
 
+zip -FFv inat.zip --out fixed.zip
+unzip fixed.zip -d inat/
+
+
+IF STEP E FREEZES ON __INIT__ loading torch extension:
+
+remmove the lock file:
+cd /home/jah649/.cache/torch_extensions/py310_cu118/<problematic_extension>
+rm lock
 
 Try this to fix random hanging process issue:
 RAY_kill_child_processes_on_worker_exit_with_raylet_subreaper=true

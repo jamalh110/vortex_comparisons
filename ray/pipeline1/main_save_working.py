@@ -39,8 +39,6 @@ def print(*args, **kw):
     #_print("[%s]" % (datetime.now()),*args, **kw, flush=False)
     _print(*args, **kw)
 
-def randomfunction(randomarg, randomarg2):
-    print("random", randomarg)
 
 @serve.deployment
 class StepA:
@@ -380,20 +378,57 @@ class Ingress:
     async def __call__(self, http_request: Request):
         try:
             requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+            #print(requestid)
+            #print("here1")
+            #await time.sleep(1000)
             input = await http_request.json()
             input['requestid'] = requestid
-
+            #print("here2")
+            #image = input['imagebytes']
+            #del input['imagebytes']
             image = {"image_path": input['img_path']}
             image['requestid'] = requestid
-
+            #print("here3")
             stepA_output = self.stepA.remote(input)
-            stepB_output = self.stepB.remote(image)    
-            output_b_raw = await stepB_output
+            #print("here4")
+            #print(image)
+            stepB_output = self.stepB.remote(image)
+            #print("here5")
+            #output_b_raw = await asyncio.wait_for(stepB_output, timeout=10)
+            
+            oref_b = await stepB_output._to_object_ref()
+            #print("here5.5")
+            #print(oref_b)
+            with open(f"{DATA_DIR}/oref_b.pkl", "wb") as f:
+                cloudpickle.dump(oref_b, f)
+
+            output_b_raw = ray.get(oref_b, timeout=10)
             output_b_raw['requestid'] = requestid
             stepC_output = self.stepC.remote(output_b_raw)
-            output_a_raw = await stepA_output
-            output_c_raw = await stepC_output
+            #stepC_output = self.stepC.remote(stepB_output)
+            #print("here6") 
+            #output_a_raw = await asyncio.wait_for(stepA_output, timeout=10)
+            oref_a = await stepA_output._to_object_ref()
+            #print("here6.5")
+            #print(oref_a)
+            with open(f"{DATA_DIR}/oref_a.pkl", "wb") as f:
+                cloudpickle.dump(oref_a, f)
+            output_a_raw = ray.get(oref_a, timeout=10)
+            #print("here7")
+            
+            #print("here8")
+            #output_c_raw = await asyncio.wait_for(stepC_output, timeout=10)
+            oref_c = await stepC_output._to_object_ref()
+            #print("here8.5")
+            #print(oref_c)
+            with open(f"{DATA_DIR}/oref_c.pkl", "wb") as f:
+                cloudpickle.dump(oref_c, f)
+            output_c_raw = ray.get(oref_c, timeout=10)
             #TODO: test if passing in the objectrefs is faster than awaitng and sending
+
+            #print(f"output_c_raw shape is : {output_c_raw['transformer_mapping_input_features'].shape}")
+            #print(f"vision_embedding shape is : {output_b_raw['vision_embeddings'].shape} | vision penultimate shape is: {output_b_raw['vision_second_last_layer_hidden_states'].shape}")
+            #print(f"text_embedding shape is : {output_a_raw['text_embeddings'].shape} | text encoder hidden shape is: {output_a_raw['text_encoder_hidden_states'].shape} | input_ids shape is: {output_a_raw['input_ids'].shape}")
 
             stepD_output = self.stepD.remote({
                 "input_ids": output_a_raw['input_ids'],
@@ -403,11 +438,26 @@ class Ingress:
                 "transformer_mapping_input_features": output_c_raw['transformer_mapping_input_features'],
                 'requestid': requestid
             })
-
-            output_d_raw = await stepD_output
+            #output_d_raw = await asyncio.wait_for(stepD_output, timeout=10)
+            oref_d = await stepD_output._to_object_ref()
+            #print("here9")
+            #print(oref_d)
+            with open(f"{DATA_DIR}/oref_d.pkl", "wb") as f:
+                cloudpickle.dump(oref_d, f)
+            output_d_raw = ray.get(oref_d, timeout=10)
+            #print(f"output_d_raw shape is : {output_d_raw.shape}")
+            #output = {key: tensor.cpu().tolist() for key, tensor in output_raw.items()}
             stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['question'], "query_embeddings": output_d_raw})
-            output = await stepE_output
-
+            #output = "Success"
+            #output = await asyncio.wait_for(stepE_output, timeout=10)
+            oref_e = await stepE_output._to_object_ref()
+            #print("here10")
+            #print(oref_e)
+            output = ray.get(oref_e , timeout=10)
+            with open(f"{DATA_DIR}/oref_e.pkl", "wb") as f:
+                cloudpickle.dump(oref_e, f)
+            #print("STEP E OPUTPUT", output)
+            #time.sleep(10)
             return output
         except Exception as e:
             print("\n\n\n\n ERROR:", e, "\n\n\n\n")
