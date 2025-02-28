@@ -26,17 +26,25 @@ import faulthandler
 import traceback
 import signal
 import pickle
+import logging
 
+from utils import make_logger
 #TODO: Keep tensors in GPU instead of copying them to cpu in __call__ of every step? 
 #TODO: test keeping tensors in gpu across ray returns and see if it is faster
 #TODO: test calling step c from step b and see if it is faster
 #TODO: test if batch works properly
 _MAX_BATCH_SIZE = 32
 DATA_DIR="/mydata"
+LOG_DIR = "/users/jamalh11/raylogs"
+
 
 @serve.deployment
 class StepA:
     def __init__(self):
+
+        
+        self.logger = make_logger(os.getpid(), "StepA", LOG_DIR)
+
         self.checkpoint_path = f"{DATA_DIR}/PreFLMR_ViT-L"
         self.local_encoder_path = f'{DATA_DIR}/EVQA/models/models_step_A_query_text_encoder.pt'
         self.local_projection_path = f'{DATA_DIR}/EVQA/models/models_step_A_query_text_linear.pt'
@@ -109,9 +117,11 @@ class StepA:
         self,
         inputs: List[Dict[str, Any]],
     ):
+        self.logger.info(f"StepA_Prepare_Start {inputs[0]['requestid']}")
         input_text_sequence = []
         for input in inputs:
             input_text_sequence.append(self.prepare_inputs(input)["text_sequence"])
+        self.logger.info(f"StepA_Prepare_End {inputs[0]['requestid']}")
         # query sentences: bsize of sentences
         encoded_inputs      = self.query_tokenizer(input_text_sequence)
         input_ids           = encoded_inputs['input_ids'].to(self.query_text_encoder.device)
@@ -137,6 +147,7 @@ class StepA:
     async def __call__(self, inputs: List[Dict[str, Any]]):
         #print("BATCH SIZE: ",len(inputs))
         #time.sleep(10)
+        self.logger.info(f"StepA_Enter {inputs[0]['requestid']}")
         output = self.stepA_output(inputs)
         text_embeddings = output['text_embeddings'].detach().cpu().numpy()
         input_ids = output['input_ids'].detach().cpu().numpy()
@@ -149,7 +160,7 @@ class StepA:
                 "input_ids": input_ids[i],
                 "text_encoder_hidden_states": text_encoder_hidden_states[i]
             })
-        print("done", inputs[0]['requestid'])
+        self.logger.info(f"StepA_Exit {inputs[0]['requestid']}")
         return results
         #return self.stepA_output(inputs)
 
@@ -175,6 +186,7 @@ class FLMRMultiLayerPerceptron(nn.Module):
 @serve.deployment
 class StepB:
     def __init__(self):
+        self.logger = make_logger(os.getpid(), "StepB", LOG_DIR)
         self.checkpoint_path = f'{DATA_DIR}/PreFLMR_ViT-L'
         self.flmr_config = FLMRConfig.from_pretrained(self.checkpoint_path)
         self.local_encoder_path = f'{DATA_DIR}/EVQA/models/models_step_B_vision_encoder.pt'
@@ -195,7 +207,8 @@ class StepB:
         self.query_vision_projection.cuda()
         self.query_vision_encoder.cuda()
 
-    def StepB_output(self, list_of_images):
+    def StepB_output(self, list_of_images, requestid):
+        self.logger.info(f"StepB_Prepare_Start {requestid}")
         pixel_values = []
         # for imgbytes in list_of_images:
         #     img = Image.open(io.BytesIO(imgbytes)).convert("RGB")
@@ -212,6 +225,7 @@ class StepB:
         pixel_values = torch.stack(pixel_values, dim=0)
         #print("here1")
         batch_size = pixel_values.shape[0]
+        self.logger.info(f"StepB_Prepare_End {requestid}")
         # Forward the vision encoder
         pixel_values = pixel_values.to(self.device)
         if len(pixel_values.shape) == 5:
@@ -220,6 +234,7 @@ class StepB:
             pixel_values = pixel_values.reshape(
                 -1, pixel_values.shape[2], pixel_values.shape[3], pixel_values.shape[4]
             )
+        
         #print("here2")
         vision_encoder_outputs = self.query_vision_encoder(pixel_values, output_hidden_states=True)
         vision_embeddings = vision_encoder_outputs.last_hidden_state[:, 0]
@@ -233,12 +248,13 @@ class StepB:
     
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, list_of_images: List[Dict[str, str]]):
+        self.logger.info(f"StepB_Enter {list_of_images[0]['requestid']}")
         #print("BATCH SIZE: ",len(list_of_images))
         #time.sleep(10)
         formatted = []
         for i in list_of_images:
             formatted.append(i['image_path'])
-        output = self.StepB_output(formatted)
+        output = self.StepB_output(formatted, requestid=list_of_images[0]['requestid'])
         vision_embeddings = output['vision_embeddings'].detach().cpu().numpy()
         vision_second_last_layer_hidden_states = output['vision_second_last_layer_hidden_states'].detach().cpu().numpy()
         results = []
@@ -247,13 +263,14 @@ class StepB:
                 "vision_embeddings": vision_embeddings[i],
                 "vision_second_last_layer_hidden_states": vision_second_last_layer_hidden_states[i]
             })
-        print("done", list_of_images[0]['requestid'])
+        self.logger.info(f"StepB_Exit {list_of_images[0]['requestid']}")
         return results
         #return self.StepB_output(list_of_images)
 
 @serve.deployment
 class StepC:
     def __init__(self):
+        self.logger = make_logger(os.getpid(), "StepC", LOG_DIR)
         self.checkpoint_path = f'{DATA_DIR}/PreFLMR_ViT-L'
         self.local_model_path = f"{DATA_DIR}/EVQA/models/models_step_C_transformer_mapping_input_linear.pt"
         self.flmr_config = None
@@ -286,6 +303,7 @@ class StepC:
     
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, input: List[Dict[str, Any]]):
+        self.logger.info(f"StepC_Enter {input[0]['requestid']}")
         #print("BATCH SIZE: ",len(input))
         vision_second_last_layer_hidden_states = []
         for i in input:
@@ -297,12 +315,13 @@ class StepC:
         ret = []
         for i in range(output.shape[0]):
             ret.append({"transformer_mapping_input_features": output[i]})
-        print("done", input[0]['requestid'])
+        self.logger.info(f"StepC_Exit {input[0]['requestid']}")
         return ret
 
 @serve.deployment
 class StepE:
     def __init__(self, experiment_name: str, index_name: str):
+        self.logger = make_logger(os.getpid(), "StepE", LOG_DIR)
         self.searcher = None
         self.index_root_path        = f'{DATA_DIR}/EVQA/index/'
         self.index_experiment_name  = experiment_name
@@ -330,6 +349,7 @@ class StepE:
         return ranking.todict()
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, input: List[Dict[str, Any]]):
+        self.logger.info(f"StepE_Enter {input[0]['requestid']}")
         #bsize = len(input)
         #print("BATCH SIZE: ",len(input))
         bsize = 32
@@ -349,7 +369,7 @@ class StepE:
         for i in input:
             ret.append(output[i['question_id']])
 
-        print("done", input[0]['requestid'])
+        self.logger.info(f"StepE_Exit {input[0]['requestid']}")
         return ret
 
 
@@ -357,6 +377,7 @@ class StepE:
 @serve.deployment
 class Ingress:
     def __init__(self, stepA: DeploymentHandle, stepB: DeploymentHandle, stepC: DeploymentHandle, stepD: DeploymentHandle, stepE: DeploymentHandle):
+        self.logger = make_logger(os.getpid(), "Ingress", LOG_DIR)
         self.stepA = stepA
         self.stepB = stepB
         self.stepC = stepC
@@ -373,10 +394,10 @@ class Ingress:
     async def __call__(self, http_request: Request):
         try:
             requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-            print("requestid", requestid)
             input = await http_request.json()
+            requestid = input.get('requestid', requestid)
             input['requestid'] = requestid
-
+            self.logger.info(f"Ingress_Enter {requestid}")
             image = {"image_path": input['img_path']}
             image['requestid'] = requestid
 
@@ -401,7 +422,7 @@ class Ingress:
             output_d_raw = await stepD_output
             stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['question'], "query_embeddings": output_d_raw, "requestid": requestid})
             output = await stepE_output
-
+            self.logger.info(f"Ingress_Exit {requestid}")
             return output
         except Exception as e:
             print("\n\n\n\n ERROR:", e, "\n\n\n\n")

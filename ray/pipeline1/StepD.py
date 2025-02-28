@@ -4,14 +4,19 @@ from flmr import FLMRConfig, FLMRQueryEncoderTokenizer, FLMRContextEncoderTokeni
 from transformers import AutoImageProcessor, BertConfig
 from transformers.models.bert.modeling_bert import BertEncoder
 from torch import Tensor, nn
+import time
 import torch
+from utils import make_logger
+import os
 
 _MAX_BATCH_SIZE = 32
 DATA_DIR="/mydata"
+LOG_DIR = "/users/jamalh11/raylogs"
 
 @serve.deployment
 class StepD:
     def __init__(self):
+        self.logger = make_logger(os.getpid(), "StepD", LOG_DIR)
         self.flmr_config = None
         self.skiplist = []
         self.query_tokenizer = None
@@ -160,6 +165,7 @@ class StepD:
     
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, inputs: List[Dict[str, Any]]):
+        self.logger.info(f"StepD_Enter {inputs[0]['requestid']}")
         #print("BATCH SIZE: ",len(inputs))
         #print("stepD inputs\n\n\n", inputs[0]['input_ids'])
         input_ids = torch.stack([torch.from_numpy(x["input_ids"]) for x in inputs], dim=0).cuda()
@@ -169,5 +175,5 @@ class StepD:
         transformer_mapping_input_features = torch.stack([torch.from_numpy(x["transformer_mapping_input_features"]) for x in inputs], dim=0).cuda()
         #print("stepD shape\n\n\n", text_embeddings.shape, vision_embeddings.shape, transformer_mapping_input_features.shape)
         query_embeddings = self.proces_queries(input_ids, text_embeddings, text_encoder_hidden_states, vision_embeddings, transformer_mapping_input_features).detach().cpu().numpy()
-        print("done", inputs[0]['requestid'])
+        self.logger.info(f"StepD_Exit {inputs[0]['requestid']}")
         return query_embeddings

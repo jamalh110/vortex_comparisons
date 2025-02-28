@@ -399,8 +399,8 @@ class Ingress:
             oref_b = await stepB_output._to_object_ref()
             #print("here5.5")
             #print(oref_b)
-            with open(f"{DATA_DIR}/oref_b.pkl", "wb") as f:
-                cloudpickle.dump(oref_b, f)
+            # with open(f"{DATA_DIR}/oref_b.pkl", "wb") as f:
+            #     cloudpickle.dump(oref_b, f)
 
             output_b_raw = ray.get(oref_b, timeout=10)
             output_b_raw['requestid'] = requestid
@@ -411,8 +411,8 @@ class Ingress:
             oref_a = await stepA_output._to_object_ref()
             #print("here6.5")
             #print(oref_a)
-            with open(f"{DATA_DIR}/oref_a.pkl", "wb") as f:
-                cloudpickle.dump(oref_a, f)
+            # with open(f"{DATA_DIR}/oref_a.pkl", "wb") as f:
+            #     cloudpickle.dump(oref_a, f)
             output_a_raw = ray.get(oref_a, timeout=10)
             #print("here7")
             
@@ -421,8 +421,8 @@ class Ingress:
             oref_c = await stepC_output._to_object_ref()
             #print("here8.5")
             #print(oref_c)
-            with open(f"{DATA_DIR}/oref_c.pkl", "wb") as f:
-                cloudpickle.dump(oref_c, f)
+            # with open(f"{DATA_DIR}/oref_c.pkl", "wb") as f:
+            #     cloudpickle.dump(oref_c, f)
             output_c_raw = ray.get(oref_c, timeout=10)
             #TODO: test if passing in the objectrefs is faster than awaitng and sending
 
@@ -442,8 +442,8 @@ class Ingress:
             oref_d = await stepD_output._to_object_ref()
             #print("here9")
             #print(oref_d)
-            with open(f"{DATA_DIR}/oref_d.pkl", "wb") as f:
-                cloudpickle.dump(oref_d, f)
+            # with open(f"{DATA_DIR}/oref_d.pkl", "wb") as f:
+            #     cloudpickle.dump(oref_d, f)
             output_d_raw = ray.get(oref_d, timeout=10)
             #print(f"output_d_raw shape is : {output_d_raw.shape}")
             #output = {key: tensor.cpu().tolist() for key, tensor in output_raw.items()}
@@ -454,8 +454,8 @@ class Ingress:
             #print("here10")
             #print(oref_e)
             output = ray.get(oref_e , timeout=10)
-            with open(f"{DATA_DIR}/oref_e.pkl", "wb") as f:
-                cloudpickle.dump(oref_e, f)
+            # with open(f"{DATA_DIR}/oref_e.pkl", "wb") as f:
+            #     cloudpickle.dump(oref_e, f)
             #print("STEP E OPUTPUT", output)
             #time.sleep(10)
             return output

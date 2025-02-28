@@ -1,9 +1,15 @@
 import json
+import random
+import string
 import time
 import requests
 from datasets import load_dataset
 import os 
 from PIL import Image
+from utils import make_logger
+
+LOGGING_DIR = "/users/jamalh11/raylogs"
+logger = make_logger(os.getpid(), "Client", LOGGING_DIR)
 
 DATA_DIR = "/mydata"
 def add_path_prefix_in_img_path(example, prefix):
@@ -43,7 +49,7 @@ def onecall():
     response = requests.post("http://127.0.0.1:8000/", json=data)
     output = response.json()
     print(output)
-onecall()
+# onecall()
 #exit(0)
 #print(ds['question_id'])
 #exit(0)
@@ -53,6 +59,9 @@ answers = []
 totaltimestart = time.time()
 for i in range(nqueries):
     data = ds[i]
+    requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+    data['requestid'] = requestid
+    logger.info(f"Client_Send {requestid}")
     for attempt in range(1, max_retries + 1):
         try:
             response = requests.post("http://127.0.0.1:8000/", json=data)
@@ -61,8 +70,9 @@ for i in range(nqueries):
             if(output[0] == "error"):
                 print("Error in query", i)
                 raise Exception("Error in query")
-            print(output)
-            print("Request",i,"took", response.elapsed.total_seconds(), "seconds")
+            logger.info(f"Client_Rec {requestid}")
+            #print(output)
+            #print("Request",i,"took", response.elapsed.total_seconds(), "seconds")
             answers.append(output)
             break  # Exit the retry loop if the request was successful
         except (requests.RequestException, json.JSONDecodeError, Exception) as e:
