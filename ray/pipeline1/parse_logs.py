@@ -342,7 +342,8 @@ if __name__ == "__main__":
     ('StepC_Exit', "StepD_Enter"),
     ('StepD_Exit', "StepE_Enter"),
     ]
-    results = analyzer.analyze_event_pairs(event_pairs)
+    event_pairs_monolith = [('Client_Send', 'Client_Rec')]
+    results = analyzer.analyze_event_pairs(event_pairs_monolith)
     #print(results)
     print("\n\n\n\n")
 
@@ -356,5 +357,5 @@ if __name__ == "__main__":
         print(f"  Median: {value['median']*1000:.1f} ms")
         if 'stdev' in value:
             print(f"  Standard Deviation: {value['stdev']*1000:.1f} ms")
-        print("\n\n\n")
+        print("")
 

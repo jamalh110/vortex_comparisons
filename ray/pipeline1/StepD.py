@@ -8,15 +8,18 @@ import time
 import torch
 from utils import make_logger
 import os
+import logging
 
 _MAX_BATCH_SIZE = 32
 DATA_DIR="/mydata"
 LOG_DIR = "/users/jamalh11/raylogs"
+LOG_LEVEL = logging.CRITICAL
 
 @serve.deployment
 class StepD:
     def __init__(self):
         self.logger = make_logger(os.getpid(), "StepD", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
         self.flmr_config = None
         self.skiplist = []
         self.query_tokenizer = None

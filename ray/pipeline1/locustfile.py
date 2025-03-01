@@ -11,6 +11,16 @@ from locust import HttpUser, task, between, events, constant
 # Global configuration and helper functions
 DATA_DIR = "/mydata"
 
+hosts = [
+        "http://10.10.1.4:8000",
+        "http://10.10.1.3:8000",
+        "http://10.10.1.2:8000",
+        "http://10.10.1.1:8000",
+    ]
+def get_random_host():
+        """Return a randomly selected host from the list."""
+        return random.choice(hosts)
+
 def add_path_prefix_in_img_path(example, prefix):
     if example["img_path"] is not None:
         example["img_path"] = os.path.join(prefix, example["img_path"])
@@ -93,7 +103,6 @@ def on_quitting(environment, **kwargs):
 
 class EVQAUser(HttpUser):
     wait_time = constant(0)  # Adjust wait time as needed
-
     @task
     def single_query(self):
         global total_queries, correct_queries
@@ -101,10 +110,10 @@ class EVQAUser(HttpUser):
         # Choose a random example from the dataset
         idx = random.randint(0, len(ds) - 1)
         data = ds[idx]
-
         max_retries = 3
+
         for attempt in range(1, max_retries + 1):
-            with self.client.post("/", json=data, catch_response=True) as response:
+            with self.client.post(f"{get_random_host()}/", json=data, catch_response=True) as response:
                 try:
                     response.raise_for_status()  # Raises exception for 4xx/5xx responses
                     output = response.json()

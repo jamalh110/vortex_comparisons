@@ -36,7 +36,7 @@ from utils import make_logger
 _MAX_BATCH_SIZE = 32
 DATA_DIR="/mydata"
 LOG_DIR = "/users/jamalh11/raylogs"
-
+LOG_LEVEL = logging.CRITICAL
 
 @serve.deployment
 class StepA:
@@ -44,7 +44,7 @@ class StepA:
 
         
         self.logger = make_logger(os.getpid(), "StepA", LOG_DIR)
-
+        self.logger.setLevel(LOG_LEVEL)
         self.checkpoint_path = f"{DATA_DIR}/PreFLMR_ViT-L"
         self.local_encoder_path = f'{DATA_DIR}/EVQA/models/models_step_A_query_text_encoder.pt'
         self.local_projection_path = f'{DATA_DIR}/EVQA/models/models_step_A_query_text_linear.pt'
@@ -187,6 +187,7 @@ class FLMRMultiLayerPerceptron(nn.Module):
 class StepB:
     def __init__(self):
         self.logger = make_logger(os.getpid(), "StepB", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
         self.checkpoint_path = f'{DATA_DIR}/PreFLMR_ViT-L'
         self.flmr_config = FLMRConfig.from_pretrained(self.checkpoint_path)
         self.local_encoder_path = f'{DATA_DIR}/EVQA/models/models_step_B_vision_encoder.pt'
@@ -271,6 +272,7 @@ class StepB:
 class StepC:
     def __init__(self):
         self.logger = make_logger(os.getpid(), "StepC", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
         self.checkpoint_path = f'{DATA_DIR}/PreFLMR_ViT-L'
         self.local_model_path = f"{DATA_DIR}/EVQA/models/models_step_C_transformer_mapping_input_linear.pt"
         self.flmr_config = None
@@ -322,6 +324,7 @@ class StepC:
 class StepE:
     def __init__(self, experiment_name: str, index_name: str):
         self.logger = make_logger(os.getpid(), "StepE", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
         self.searcher = None
         self.index_root_path        = f'{DATA_DIR}/EVQA/index/'
         self.index_experiment_name  = experiment_name
@@ -373,11 +376,11 @@ class StepE:
         return ret
 
 
-#TODO: pass in a request ID to make sure things are actually being called
 @serve.deployment
 class Ingress:
     def __init__(self, stepA: DeploymentHandle, stepB: DeploymentHandle, stepC: DeploymentHandle, stepD: DeploymentHandle, stepE: DeploymentHandle):
         self.logger = make_logger(os.getpid(), "Ingress", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
         self.stepA = stepA
         self.stepB = stepB
         self.stepC = stepC
