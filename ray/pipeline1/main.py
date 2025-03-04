@@ -34,6 +34,7 @@ from utils import make_logger
 #TODO: test calling step c from step b and see if it is faster
 #TODO: test if batch works properly
 _MAX_BATCH_SIZE = 32
+_STEP_E_BATCH_SIZE = 32
 DATA_DIR="/mydata"
 LOG_DIR = "/users/jamalh11/raylogs"
 LOG_LEVEL = logging.CRITICAL
@@ -350,12 +351,12 @@ class StepE:
             centroid_search_batch_size=bsize,
         )
         return ranking.todict()
-    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    @serve.batch(max_batch_size=_STEP_E_BATCH_SIZE)
     async def __call__(self, input: List[Dict[str, Any]]):
         self.logger.info(f"StepE_Enter {input[0]['requestid']}")
         #bsize = len(input)
         #print("BATCH SIZE: ",len(input))
-        bsize = 32
+        bsize = None
         queries = {}
         query_embeddings_list = []
         for i in input:

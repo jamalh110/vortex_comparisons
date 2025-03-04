@@ -77,19 +77,19 @@ applications:
         deploy_abcd: 0.01
 
   - name: StepE
-    num_replicas: 3
-    max_ongoing_requests: 16
+    num_replicas: 4
+    max_ongoing_requests: 32
     ray_actor_options:
       num_cpus: 4.0
       num_gpus: 0.04
       resources:
-        deploy_e: 1
+        deploy_e: 0
       runtime_env:
           env_vars:
             COLBERT_LOAD_TORCH_EXTENSION_VERBOSE: "True"
 
   - name: Ingress
-    num_replicas: 8
+    num_replicas: 4
     max_ongoing_requests: 200
     ray_actor_options:
       num_cpus: 1.0

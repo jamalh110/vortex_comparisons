@@ -121,7 +121,7 @@ class Monolith:
         
         input_jsons = [await i.json() for i in http_request]
         
-        bsize               = 32
+        bsize               = None
 
         image_paths = [i["img_path"] for i in input_jsons]
         question_ids = [i["question_id"] for i in input_jsons]

@@ -102,7 +102,8 @@ def on_quitting(environment, **kwargs):
 
 
 class EVQAUser(HttpUser):
-    wait_time = constant(0)  # Adjust wait time as needed
+    #wait_time = constant(0)  # Adjust wait time as needed
+    #wait_time = between(1, 4)  # Random wait time between requests
     @task
     def single_query(self):
         global total_queries, correct_queries
