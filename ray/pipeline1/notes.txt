@@ -52,6 +52,21 @@ cd /home/jah649/.cache/torch_extensions/py310_cu118/<problematic_extension>
 rm lock
 
 
+For first 3 nodes:
+ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.4 --resources='{"deploy_abcd": 1}'
+ray start --address 10.10.1.4:6379 --node-ip-address 10.10.1.1 --resources='{"deploy_abcd": 1}'
+
+MIG partitions for 4th node:
+sudo nvidia-smi -i 0 -mig 1
+sudo reboot
+sudo nvidia-smi mig -i 0 -cgi 1g.6gb -C
+use nvidia-smi -L to get UUIDs
+run ray like so:
+CUDA_VISIBLE_DEVICES=MIG-5fc13c84-c5b6-54aa-9151-439b2bcd020d,MIG-e37a628c-f7e3-5676-a402-6ae0f4d58a5c,MIG-5612ed26-18d0-54ef-a7d5-2488b7c0d34f,MIG-2a7c6f10-618e-5c44-87dd-105b4856f2a9  ray start --address 10.10.1.4:6379 --node-ip-address 10.10.1.3 --num-gpus=4 --resources='{"deploy_e": 4}'
+
+To deploy ray serve:
+serve shutdown -y && serve deploy serve_config.yaml
+
 LOCUST:
 sudo /users/jamalh11/.local/bin/locust -f locustfile.py --users 1 --spawn-rate 2 --headless -H http://10.10.1.4:8000
 
