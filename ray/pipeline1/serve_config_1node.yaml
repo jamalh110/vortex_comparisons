@@ -54,13 +54,6 @@ applications:
       num_cpus: 1.0
       num_gpus: 0.1
 
-  - name: StepC
-    num_replicas: 1
-    max_ongoing_requests: 32
-    ray_actor_options:
-      num_cpus: 1.0
-      num_gpus: 0.015
-
   - name: StepD
     num_replicas: 1
     max_ongoing_requests: 32

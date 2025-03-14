@@ -59,15 +59,15 @@ applications:
       resources:
         deploy_abcd: 0.7
 
-  - name: StepC
-    num_replicas: 1
-    max_ongoing_requests: 32
-    ray_actor_options:
-      num_cpus: 2.0
-      num_gpus: 0.015
-      resources:
-        #deploy_abcd: 0.01
-        deploy_e: 0.01
+  # - name: StepC
+  #   num_replicas: 1
+  #   max_ongoing_requests: 32
+  #   ray_actor_options:
+  #     num_cpus: 2.0
+  #     num_gpus: 0.015
+  #     resources:
+  #       #deploy_abcd: 0.01
+  #       deploy_e: 0.01
 
   - name: StepD
     num_replicas: 1

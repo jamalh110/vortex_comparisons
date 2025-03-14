@@ -5,7 +5,7 @@ export PATH=/usr/local/cuda/bin:$PATH
 
 git clone https://github.com/facebookresearch/faiss.git
 cd faiss
-git checkout v1.7.4
+#git checkout v1.7.4
 build_path="build"
 if [ -z $FAISS_INSTALL_PREFIX ]; then
     install_prefix="/usr/local"

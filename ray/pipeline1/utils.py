@@ -19,3 +19,14 @@ def make_logger(pid, name, logdir):
     logger.addHandler(stream_handler)
     
     return logger
+
+def logfunc(logger, inputs, stepname):
+    if len(inputs) == 0:
+        return ""
+    
+    str = ""
+    for i in range(len(inputs)-1):
+        str += f"{stepname} {inputs[i]['requestid']}\n"
+    str += f"{stepname} {inputs[-1]['requestid']}"
+
+    logger.info(str)

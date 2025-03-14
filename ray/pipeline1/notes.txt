@@ -10,14 +10,17 @@ git lfs install
 git lfs version
 
 
+sudo chmod -R a+rwx /mydata
 cd /mydata
-sudo git clone https://huggingface.co/LinWeizheDragon/PreFLMR_ViT-L
-sudo git clone https://huggingface.co/openai/clip-vit-large-patch14
+git clone https://huggingface.co/LinWeizheDragon/PreFLMR_ViT-L
+git clone https://huggingface.co/openai/clip-vit-large-patch14
 
 cd ~/vortex_comparisons/ray/pipeline1
 git clone https://github.com/LinWeizheDragon/FLMR.git
 sudo pip uninstall torch torchvision torchaudio
 sudo pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+pip uninstall numpy && pip install numpy==1.26.4
 
 pip uninstall faiss
 sudo ./faiss.sh
@@ -28,21 +31,12 @@ pip install -e .
 cd third_party/ColBERT
 pip install -e .
 
-
-pip install ujson gitpython easydict datasets transformers pillow easydict ninja
-pip uninstall ninja
-sudo pip install ninja
-
-pip uninstall numpy
-pip install numpy==1.26.4
-
-sudo ./download_evqa.sh
 do the inat zip fix:
 
 cd /mydata/EVQA
 sudo apt install zip
 sudo zip -FFv inat.zip --out fixed.zip
-sudo unzip fixed.zip -d inat/
+sudo unzip fixed.zip -d inat/ > /dev/null 2>&1 
 
 
 IF STEP E FREEZES ON __INIT__ loading torch extension:
@@ -53,8 +47,8 @@ rm lock
 
 
 For first 3 nodes:
-ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.4 --resources='{"deploy_abcd": 1}'
-ray start --address 10.10.1.4:6379 --node-ip-address 10.10.1.1 --resources='{"deploy_abcd": 1}'
+ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.13 --resources='{"deploy_abcd": 1}'
+ray start --address 10.10.1.13:6379 --node-ip-address 10.10.1.1 --resources='{"deploy_abcd": 1}'
 
 MIG partitions for 4th node:
 sudo nvidia-smi -i 0 -mig 1
@@ -62,7 +56,7 @@ sudo reboot
 sudo nvidia-smi mig -i 0 -cgi 1g.6gb -C
 use nvidia-smi -L to get UUIDs
 run ray like so:
-CUDA_VISIBLE_DEVICES=MIG-5fc13c84-c5b6-54aa-9151-439b2bcd020d,MIG-e37a628c-f7e3-5676-a402-6ae0f4d58a5c,MIG-5612ed26-18d0-54ef-a7d5-2488b7c0d34f,MIG-2a7c6f10-618e-5c44-87dd-105b4856f2a9  ray start --address 10.10.1.4:6379 --node-ip-address 10.10.1.3 --num-gpus=4 --resources='{"deploy_e": 4}'
+CUDA_VISIBLE_DEVICES=MIG-efb9cd1f-5a0f-569b-98b3-d0ea501d8c4e,MIG-5dfdb424-8448-5ca7-a15e-75706b8d5ab6,MIG-2c1b2fae-443c-5fa4-8530-ee9471c2d057,MIG-f845e8ee-9f2a-5a0d-991e-707536011766  ray start --address 10.10.1.13:6379 --node-ip-address 10.10.1.10 --num-gpus=4 --resources='{"deploy_e": 4}'
 
 To deploy ray serve:
 serve shutdown -y && serve deploy serve_config.yaml

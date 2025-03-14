@@ -21,14 +21,14 @@ from transformers.models.bert.modeling_bert import BertEncoder
 from StepD import StepD
 import random
 import string
-
+import numpy as np
 import faulthandler
 import traceback
 import signal
 import pickle
 import logging
 
-from utils import make_logger
+from utils import make_logger, logfunc
 #TODO: Keep tensors in GPU instead of copying them to cpu in __call__ of every step? 
 #TODO: test keeping tensors in gpu across ray returns and see if it is faster
 #TODO: test calling step c from step b and see if it is faster
@@ -37,7 +37,8 @@ _MAX_BATCH_SIZE = 32
 _STEP_E_BATCH_SIZE = 32
 DATA_DIR="/mydata"
 LOG_DIR = "/users/jamalh11/raylogs"
-LOG_LEVEL = logging.CRITICAL
+LOG_LEVEL = logging.INFO
+
 
 @serve.deployment
 class StepA:
@@ -118,11 +119,11 @@ class StepA:
         self,
         inputs: List[Dict[str, Any]],
     ):
-        self.logger.info(f"StepA_Prepare_Start {inputs[0]['requestid']}")
+        #self.logger.info(f"StepA_Prepare_Start {inputs[0]['requestid']}")
         input_text_sequence = []
         for input in inputs:
-            input_text_sequence.append(self.prepare_inputs(input)["text_sequence"])
-        self.logger.info(f"StepA_Prepare_End {inputs[0]['requestid']}")
+            input_text_sequence.append(input["text_sequence"])
+        #self.logger.info(f"StepA_Prepare_End {inputs[0]['requestid']}")
         # query sentences: bsize of sentences
         encoded_inputs      = self.query_tokenizer(input_text_sequence)
         input_ids           = encoded_inputs['input_ids'].to(self.query_text_encoder.device)
@@ -148,7 +149,7 @@ class StepA:
     async def __call__(self, inputs: List[Dict[str, Any]]):
         #print("BATCH SIZE: ",len(inputs))
         #time.sleep(10)
-        self.logger.info(f"StepA_Enter {inputs[0]['requestid']}")
+        logfunc(self.logger, inputs, "StepA_Enter")
         output = self.stepA_output(inputs)
         text_embeddings = output['text_embeddings'].detach().cpu().numpy()
         input_ids = output['input_ids'].detach().cpu().numpy()
@@ -161,7 +162,7 @@ class StepA:
                 "input_ids": input_ids[i],
                 "text_encoder_hidden_states": text_encoder_hidden_states[i]
             })
-        self.logger.info(f"StepA_Exit {inputs[0]['requestid']}")
+        logfunc(self.logger, inputs, "StepA_Exit")
         return results
         #return self.stepA_output(inputs)
 
@@ -209,25 +210,11 @@ class StepB:
         self.query_vision_projection.cuda()
         self.query_vision_encoder.cuda()
 
-    def StepB_output(self, list_of_images, requestid):
-        self.logger.info(f"StepB_Prepare_Start {requestid}")
-        pixel_values = []
-        # for imgbytes in list_of_images:
-        #     img = Image.open(io.BytesIO(imgbytes)).convert("RGB")
-        #     encoded = self.image_processor(img, return_tensors="pt")
-        #     pixel_values.append(encoded.pixel_values)
-    
-        for img_path in list_of_images:
-            if img_path is None:
-                image = Image.new("RGB", (336, 336), color='black')
-            else:
-                image = Image.open(img_path).convert("RGB")
-            encoded = self.image_processor(image, return_tensors="pt")
-            pixel_values.append(encoded.pixel_values)
-        pixel_values = torch.stack(pixel_values, dim=0)
+    def StepB_output(self, pixel_values, requestid):
+        #self.logger.info(f"StepB_Prepare_Start {requestid}")
         #print("here1")
         batch_size = pixel_values.shape[0]
-        self.logger.info(f"StepB_Prepare_End {requestid}")
+        #self.logger.info(f"StepB_Prepare_End {requestid}")
         # Forward the vision encoder
         pixel_values = pixel_values.to(self.device)
         if len(pixel_values.shape) == 5:
@@ -249,14 +236,15 @@ class StepB:
         return {"vision_embeddings": vision_embeddings, "vision_second_last_layer_hidden_states": vision_second_last_layer_hidden_states}
     
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
-    async def __call__(self, list_of_images: List[Dict[str, str]]):
-        self.logger.info(f"StepB_Enter {list_of_images[0]['requestid']}")
+    async def __call__(self, input: List[Dict[str, Any]]):
+        rid = input[0]['requestid']
+        logfunc(self.logger, input, "StepB_Enter")
         #print("BATCH SIZE: ",len(list_of_images))
         #time.sleep(10)
-        formatted = []
-        for i in list_of_images:
-            formatted.append(i['image_path'])
-        output = self.StepB_output(formatted, requestid=list_of_images[0]['requestid'])
+        pixel_values = []
+        for i in input:
+            pixel_values.append(torch.from_numpy(i['pixel_values']))
+        output = self.StepB_output(torch.stack(pixel_values, dim=0), requestid='abcd')
         vision_embeddings = output['vision_embeddings'].detach().cpu().numpy()
         vision_second_last_layer_hidden_states = output['vision_second_last_layer_hidden_states'].detach().cpu().numpy()
         results = []
@@ -265,61 +253,9 @@ class StepB:
                 "vision_embeddings": vision_embeddings[i],
                 "vision_second_last_layer_hidden_states": vision_second_last_layer_hidden_states[i]
             })
-        self.logger.info(f"StepB_Exit {list_of_images[0]['requestid']}")
+        logfunc(self.logger, input, "StepB_Exit")
         return results
         #return self.StepB_output(list_of_images)
-
-@serve.deployment
-class StepC:
-    def __init__(self):
-        self.logger = make_logger(os.getpid(), "StepC", LOG_DIR)
-        self.logger.setLevel(LOG_LEVEL)
-        self.checkpoint_path = f'{DATA_DIR}/PreFLMR_ViT-L'
-        self.local_model_path = f"{DATA_DIR}/EVQA/models/models_step_C_transformer_mapping_input_linear.pt"
-        self.flmr_config = None
-        self.load_model_cpu()
-        self.load_model_gpu()
-
-    def load_model_cpu(self):
-        self.flmr_config = FLMRConfig.from_pretrained(self.checkpoint_path)
-        
-        transformer_mapping_config_base = self.flmr_config.transformer_mapping_config_base
-        transformer_mapping_config = BertConfig.from_pretrained(transformer_mapping_config_base)
-        transformer_mapping_config.num_hidden_layers = self.flmr_config.transformer_mapping_num_hidden_layers
-        transformer_mapping_config.is_decoder = True
-        transformer_mapping_config.add_cross_attention = True
-        #print(f'found local model for step C, now loading...')
-        self.transformer_mapping_input_linear = nn.Linear(
-            self.flmr_config.vision_config.hidden_size, transformer_mapping_config.hidden_size
-        )
-        self.transformer_mapping_input_linear.load_state_dict(torch.load(self.local_model_path, weights_only=True))
-        
-    def load_model_gpu(self):
-        self.transformer_mapping_input_linear.cuda()
-
-    def stepC_output(self, vision_second_last_layer_hidden_states):
-        transformer_mapping_input_features = self.transformer_mapping_input_linear(
-            vision_second_last_layer_hidden_states
-        )
-        
-        return transformer_mapping_input_features
-    
-    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
-    async def __call__(self, input: List[Dict[str, Any]]):
-        self.logger.info(f"StepC_Enter {input[0]['requestid']}")
-        #print("BATCH SIZE: ",len(input))
-        vision_second_last_layer_hidden_states = []
-        for i in input:
-            vision_second_last_layer_hidden_states.append(torch.from_numpy(i['vision_second_last_layer_hidden_states']))
-        combined_tensor = torch.stack(vision_second_last_layer_hidden_states, dim=0)
-        output = self.stepC_output(combined_tensor.cuda()).detach().cpu().numpy()
-        #list_of_tensors = list(output.unbind(dim=0))
-        #return list_of_tensors
-        ret = []
-        for i in range(output.shape[0]):
-            ret.append({"transformer_mapping_input_features": output[i]})
-        self.logger.info(f"StepC_Exit {input[0]['requestid']}")
-        return ret
 
 @serve.deployment
 class StepE:
@@ -353,7 +289,7 @@ class StepE:
         return ranking.todict()
     @serve.batch(max_batch_size=_STEP_E_BATCH_SIZE)
     async def __call__(self, input: List[Dict[str, Any]]):
-        self.logger.info(f"StepE_Enter {input[0]['requestid']}")
+        logfunc(self.logger, input, "StepE_Enter")
         #bsize = len(input)
         #print("BATCH SIZE: ",len(input))
         bsize = None
@@ -373,18 +309,17 @@ class StepE:
         for i in input:
             ret.append(output[i['question_id']])
 
-        self.logger.info(f"StepE_Exit {input[0]['requestid']}")
+        logfunc(self.logger, input, "StepE_Exit")
         return ret
 
 
 @serve.deployment
 class Ingress:
-    def __init__(self, stepA: DeploymentHandle, stepB: DeploymentHandle, stepC: DeploymentHandle, stepD: DeploymentHandle, stepE: DeploymentHandle):
+    def __init__(self, stepA: DeploymentHandle, stepB: DeploymentHandle, stepD: DeploymentHandle, stepE: DeploymentHandle):
         self.logger = make_logger(os.getpid(), "Ingress", LOG_DIR)
         self.logger.setLevel(LOG_LEVEL)
         self.stepA = stepA
         self.stepB = stepB
-        self.stepC = stepC
         self.stepD = stepD
         self.stepE = stepE
         faulthandler.enable()
@@ -401,17 +336,17 @@ class Ingress:
             input = await http_request.json()
             requestid = input.get('requestid', requestid)
             input['requestid'] = requestid
-            self.logger.info(f"Ingress_Enter {requestid}")
-            image = {"image_path": input['img_path']}
+            logfunc(self.logger, [{"requestid": requestid}], "Ingress_Enter")
+            image = {"pixel_values": np.array(input['pixel_values'])}
             image['requestid'] = requestid
 
             stepA_output = self.stepA.remote(input)
             stepB_output = self.stepB.remote(image)    
             output_b_raw = await stepB_output
-            output_b_raw['requestid'] = requestid
-            stepC_output = self.stepC.remote(output_b_raw)
+            #output_b_raw['requestid'] = requestid
+            #stepC_output = self.stepC.remote(output_b_raw)
             output_a_raw = await stepA_output
-            output_c_raw = await stepC_output
+            #output_c_raw = await stepC_output
             #TODO: test if passing in the objectrefs is faster than awaitng and sending
 
             stepD_output = self.stepD.remote({
@@ -419,14 +354,14 @@ class Ingress:
                 "text_embeddings": output_a_raw['text_embeddings'],
                 "text_encoder_hidden_states": output_a_raw['text_encoder_hidden_states'],
                 "vision_embeddings": output_b_raw['vision_embeddings'],
-                "transformer_mapping_input_features": output_c_raw['transformer_mapping_input_features'],
+                "vision_second_last_layer_hidden_states": output_b_raw['vision_second_last_layer_hidden_states'],
                 'requestid': requestid
             })
 
             output_d_raw = await stepD_output
             stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['question'], "query_embeddings": output_d_raw, "requestid": requestid})
             output = await stepE_output
-            self.logger.info(f"Ingress_Exit {requestid}")
+            logfunc(self.logger, [{"requestid": requestid}], "Ingress_Exit")
             return output
         except Exception as e:
             print("\n\n\n\n ERROR:", e, "\n\n\n\n")
@@ -445,10 +380,9 @@ def app(args: Dict[str, str]) -> Application:
     index_name = args.get("index_name", "EVQA_PreFLMR_ViT-L")
     stepA = StepA.bind()
     stepB = StepB.bind()
-    stepC = StepC.bind()
     stepD = StepD.bind()
     stepE = StepE.bind(experiment_name=experiment_name, index_name=index_name)
-    return Ingress.bind(stepA=stepA, stepB=stepB, stepC=stepC, stepD=stepD, stepE=stepE)
+    return Ingress.bind(stepA=stepA, stepB=stepB, stepD=stepD, stepE=stepE)
 
 # def app(args: Dict[str, str]) -> Application:
 #     stepA = StepA.bind()

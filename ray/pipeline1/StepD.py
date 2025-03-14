@@ -6,14 +6,14 @@ from transformers.models.bert.modeling_bert import BertEncoder
 from torch import Tensor, nn
 import time
 import torch
-from utils import make_logger
+from utils import make_logger, logfunc
 import os
 import logging
 
 _MAX_BATCH_SIZE = 32
 DATA_DIR="/mydata"
 LOG_DIR = "/users/jamalh11/raylogs"
-LOG_LEVEL = logging.CRITICAL
+LOG_LEVEL = logging.INFO
 
 @serve.deployment
 class StepD:
@@ -31,9 +31,10 @@ class StepD:
         self.transformer_mapping_config_base = 'bert-base-uncased'
         self.local_tf_mapping_path = f'{DATA_DIR}/EVQA/models/models_step_D_transformer_mapping.pt'
         self.local_tf_mapping_output_path = f'{DATA_DIR}/EVQA/models/models_step_D_transformer_mapping_output.pt'
+        self.local_model_path_stepc = f"{DATA_DIR}/EVQA/models/models_step_C_transformer_mapping_input_linear.pt"
         self.transformer_mapping_network = None
         self.transformer_mapping_output_linear = None
-        
+        self.transformer_mapping_input_linear = None
         self.mask_instruction = False
         
         # Kep track of collected intermediate results: {query_id0: IntermediateResult, query_id2:{} ...}
@@ -66,10 +67,22 @@ class StepD:
             )[0]
         else:
             self.mask_instruction = False
+        
+        transformer_mapping_config_base_stepc = self.flmr_config.transformer_mapping_config_base
+        transformer_mapping_config_stepc = BertConfig.from_pretrained(transformer_mapping_config_base_stepc)
+        transformer_mapping_config_stepc.num_hidden_layers = self.flmr_config.transformer_mapping_num_hidden_layers
+        transformer_mapping_config_stepc.is_decoder = True
+        transformer_mapping_config_stepc.add_cross_attention = True
+
+        self.transformer_mapping_input_linear = nn.Linear(
+            self.flmr_config.vision_config.hidden_size, transformer_mapping_config_stepc.hidden_size
+        )
+        self.transformer_mapping_input_linear.load_state_dict(torch.load(self.local_model_path_stepc, weights_only=True))
 
     def load_model_gpu(self):
         self.transformer_mapping_network.cuda()
         self.transformer_mapping_output_linear.cuda()
+        self.transformer_mapping_input_linear.cuda()
 
     def mask(self, input_ids, skiplist):
         return [[(x not in skiplist) and (x != 0) for x in d] for d in input_ids.detach().cpu().tolist()]
@@ -168,15 +181,80 @@ class StepD:
     
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, inputs: List[Dict[str, Any]]):
-        self.logger.info(f"StepD_Enter {inputs[0]['requestid']}")
+        logfunc(self.logger, inputs, "StepD_Enter")
         #print("BATCH SIZE: ",len(inputs))
         #print("stepD inputs\n\n\n", inputs[0]['input_ids'])
+        vision_second_last_layer_hidden_states = torch.stack([torch.from_numpy(x["vision_second_last_layer_hidden_states"]) for x in inputs], dim=0).cuda()
+
+        transformer_mapping_input_features = self.transformer_mapping_input_linear(
+            vision_second_last_layer_hidden_states
+        )
+
         input_ids = torch.stack([torch.from_numpy(x["input_ids"]) for x in inputs], dim=0).cuda()
         text_embeddings = torch.stack([torch.from_numpy(x["text_embeddings"]) for x in inputs], dim=0).cuda()
         text_encoder_hidden_states = torch.stack([torch.from_numpy(x["text_encoder_hidden_states"]) for x in inputs], dim=0).cuda()
         vision_embeddings = torch.stack([torch.from_numpy(x["vision_embeddings"]) for x in inputs], dim=0).cuda()
-        transformer_mapping_input_features = torch.stack([torch.from_numpy(x["transformer_mapping_input_features"]) for x in inputs], dim=0).cuda()
+
+        #transformer_mapping_input_features = torch.stack([torch.from_numpy(x["transformer_mapping_input_features"]) for x in inputs], dim=0).cuda()
         #print("stepD shape\n\n\n", text_embeddings.shape, vision_embeddings.shape, transformer_mapping_input_features.shape)
         query_embeddings = self.proces_queries(input_ids, text_embeddings, text_encoder_hidden_states, vision_embeddings, transformer_mapping_input_features).detach().cpu().numpy()
-        self.logger.info(f"StepD_Exit {inputs[0]['requestid']}")
+        logfunc(self.logger, inputs, "StepD_Exit")
         return query_embeddings
+
+
+
+
+
+
+
+# @serve.deployment
+# class StepC:
+#     def __init__(self):
+#         self.logger = make_logger(os.getpid(), "StepC", LOG_DIR)
+#         self.logger.setLevel(LOG_LEVEL)
+#         self.checkpoint_path = f'{DATA_DIR}/PreFLMR_ViT-L'
+#         self.local_model_path = f"{DATA_DIR}/EVQA/models/models_step_C_transformer_mapping_input_linear.pt"
+#         self.flmr_config = None
+#         self.load_model_cpu()
+#         self.load_model_gpu()
+
+#     def load_model_cpu(self):
+#         self.flmr_config = FLMRConfig.from_pretrained(self.checkpoint_path)
+        
+#         transformer_mapping_config_base = self.flmr_config.transformer_mapping_config_base
+#         transformer_mapping_config = BertConfig.from_pretrained(transformer_mapping_config_base)
+#         transformer_mapping_config.num_hidden_layers = self.flmr_config.transformer_mapping_num_hidden_layers
+#         transformer_mapping_config.is_decoder = True
+#         transformer_mapping_config.add_cross_attention = True
+#         #print(f'found local model for step C, now loading...')
+#         self.transformer_mapping_input_linear = nn.Linear(
+#             self.flmr_config.vision_config.hidden_size, transformer_mapping_config.hidden_size
+#         )
+#         self.transformer_mapping_input_linear.load_state_dict(torch.load(self.local_model_path, weights_only=True))
+        
+#     def load_model_gpu(self):
+#         self.transformer_mapping_input_linear.cuda()
+
+#     def stepC_output(self, vision_second_last_layer_hidden_states):
+#         transformer_mapping_input_features = self.transformer_mapping_input_linear(
+#             vision_second_last_layer_hidden_states
+#         )
+        
+#         return transformer_mapping_input_features
+    
+#     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+#     async def __call__(self, input: List[Dict[str, Any]]):
+#         self.logger.info(f"StepC_Enter {input[0]['requestid']}")
+#         #print("BATCH SIZE: ",len(input))
+#         vision_second_last_layer_hidden_states = []
+#         for i in input:
+#             vision_second_last_layer_hidden_states.append(torch.from_numpy(i['vision_second_last_layer_hidden_states']))
+#         combined_tensor = torch.stack(vision_second_last_layer_hidden_states, dim=0)
+#         output = self.stepC_output(combined_tensor.cuda()).detach().cpu().numpy()
+#         #list_of_tensors = list(output.unbind(dim=0))
+#         #return list_of_tensors
+#         ret = []
+#         for i in range(output.shape[0]):
+#             ret.append({"transformer_mapping_input_features": output[i]})
+#         self.logger.info(f"StepC_Exit {input[0]['requestid']}")
+#         return ret
