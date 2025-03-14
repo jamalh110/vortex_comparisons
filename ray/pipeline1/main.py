@@ -333,7 +333,11 @@ class Ingress:
     async def __call__(self, http_request: Request):
         try:
             requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-            input = await http_request.json()
+
+            #input = await http_request.json()
+            input = await http_request.body()
+            input = pickle.loads(input)
+            
             requestid = input.get('requestid', requestid)
             input['requestid'] = requestid
             logfunc(self.logger, [{"requestid": requestid}], "Ingress_Enter")

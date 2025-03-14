@@ -1,4 +1,5 @@
 import json
+import pickle
 import random
 import string
 import threading
@@ -90,17 +91,20 @@ def convert_to_numpy(example):
         example["pixel_values"] = example["pixel_values"][0].numpy().tolist()
     return example
 def convert_to_numpy_map(example):
-    print(example['pixel_values'])
+    #print(example['pixel_values'])
     example["input_ids"] = example["input_ids"].numpy().tolist()
     example["attention_mask"] = example["attention_mask"].numpy().tolist()
     example["pixel_values"] = example["pixel_values"].numpy().tolist()
     return example
 
-def request_task(url, json):
-    requests.post(url, json=data)
+def request_task(url, data_bytes):
+    headers = {'Content-Type': 'application/octet-stream'}
+    response = requests.post(url, data=data_bytes, headers=headers)
 
-def fire_and_forget(url, json):
-    threading.Thread(target=request_task, args=(url, json)).start()
+
+def fire_and_forget(url, data_bytes):
+    threading.Thread(target=request_task, args=(url, data_bytes)).start()
+    
 
 
 if __name__ == "__main__":
@@ -136,7 +140,7 @@ if __name__ == "__main__":
         num_proc=1,
     )
     
-    
+
 
     #map ds to make input_ids, attention_mask, and pixel_values numpy arrays instead of tensors
 
@@ -162,38 +166,59 @@ if __name__ == "__main__":
     #ds = ds.map(process_image)
 
     #print(ds[0])
-
+    
     def onecall():
         data = ds[0]
-        response = requests.post("http://127.0.0.1:8000/", json=data)
+        data_bytes = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+        
+        headers = {'Content-Type': 'application/octet-stream'}
+        totaltimestart = time.time()
+        response = requests.post("http://127.0.0.1:8000/", 
+                            data=data_bytes,
+                            headers=headers)
         output = response.json()
+        print("TOTAL TIME:", time.time()-totaltimestart)
         print(output)
-    # onecall()
+    
+    onecall()
+    
+
+    
+
     #exit(0)
     #print(ds['question_id'])
     #exit(0)
-    nqueries = 500
+    nqueries = 100
     max_retries = 3
     answers = []
+    bytes_to_send = []
+    for i in range(nqueries):
+        data = ds[i]
+        requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        data['requestid'] = requestid
+        data_bytes = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+        bytes_to_send.append((data_bytes, requestid))
+    
     totaltimestart = time.time()
 
     
 
-    for batch_idx, batch in enumerate(loader):
-        if batch_idx >= nqueries:
-            break
+    for req in bytes_to_send:
+
         #print(batch['text_sequence'], batch['question'])
         #data = convert_to_numpy(batch)
-        data = batch
-        data['pixel_values'] = data['pixel_values'][0]
-        data['attention_mask'] = data['attention_mask'][0]
-        data['input_ids'] = data['input_ids'][0]
-        data['text_sequence'] = data['text_sequence'][0]
-        data['question'] = data['question'][0]
-        data['question_id'] = data['question_id'][0]
+        # data = batch
+        # data['pixel_values'] = data['pixel_values'][0]
+        # data['attention_mask'] = data['attention_mask'][0]
+        # data['input_ids'] = data['input_ids'][0]
+        # data['text_sequence'] = data['text_sequence'][0]
+        # data['question'] = data['question'][0]
+        # data['question_id'] = data['question_id'][0]
 
-        requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
-        data['requestid'] = requestid
+        # requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        # data['requestid'] = requestid
+        data = req[0]
+        requestid = req[1]
         logger.info(f"Client_Send {requestid}")
         for attempt in range(1, max_retries + 1):
             try:
@@ -217,7 +242,7 @@ if __name__ == "__main__":
                 else:
                     # Optionally add a delay before retrying
                     time.sleep(1)
-            time.sleep(0.01)
+        time.sleep(0.5)
 
 
 

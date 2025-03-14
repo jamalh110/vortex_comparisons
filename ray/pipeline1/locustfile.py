@@ -7,15 +7,19 @@ from PIL import Image
 import requests
 from datasets import load_dataset
 from locust import HttpUser, task, between, events, constant
-
+from easydict import EasyDict
+import torch
+from flmr import (
+    FLMRConfig,
+    FLMRQueryEncoderTokenizer,
+)
+from torch.utils.data import DataLoader
+from transformers import AutoImageProcessor
 # Global configuration and helper functions
 DATA_DIR = "/mydata"
 
 hosts = [
-        "http://10.10.1.4:8000",
-        "http://10.10.1.3:8000",
-        "http://10.10.1.2:8000",
-        "http://10.10.1.1:8000",
+        "http://10.10.1.13:8000"
     ]
 def get_random_host():
         """Return a randomly selected host from the list."""
@@ -35,12 +39,69 @@ def process_image(example):
     example["imagebytes"] = image.tobytes()
     return example
 
+def prepare_inputs(sample, config):
+    sample = EasyDict(sample)
+
+    module = EasyDict(
+        {"type": "QuestionInput", "option": "default", "separation_tokens": {"start": "", "end": ""}}
+    )
+
+    instruction = sample.instruction.strip()
+    if instruction[-1] != ":":
+        instruction = instruction + ":"
+    instruction = instruction.replace(":", config.mask_instruction_token)
+    #random_instruction = random.choice(instructions)
+    text_sequence = " ".join(
+        [instruction]
+        + [module.separation_tokens.start]
+        + [sample.question]
+        + [module.separation_tokens.end]
+    )
+
+    sample["text_sequence"] = text_sequence
+
+    return sample
+
+def tokenize_inputs(examples, query_tokenizer, image_processor):
+    encoding = query_tokenizer(examples["text_sequence"])
+    examples["input_ids"] = encoding["input_ids"]
+    examples["attention_mask"] = encoding["attention_mask"]
+
+    pixel_values = []
+    for img_path in examples["img_path"]:
+
+        if img_path is None:
+            image = Image.new("RGB", (336, 336), color='black')
+        else:
+            image = Image.open(img_path).convert("RGB")
+        
+        encoded = image_processor(image, return_tensors="pt")
+        pixel_values.append(encoded.pixel_values)
+
+    pixel_values = torch.stack(pixel_values, dim=0)
+    examples["pixel_values"] = pixel_values
+    return examples
+
+def convert_to_numpy(example):
+    #print(example['pixel_values'])
+    #example["input_ids"] = example["input_ids"].numpy().tolist()
+    #example["attention_mask"] = example["attention_mask"].numpy().tolist()
+    #example["pixel_values"] = example["pixel_values"].numpy().tolist()
+    return example
+
 # Dataset directories and loading
 image_root_dir = f"{DATA_DIR}/EVQA"
 use_split = "train"
 ds_dir = f"{DATA_DIR}/EVQA/EVQA_data/EVQA_data"
 p_ds_dir = f"{DATA_DIR}/EVQA/EVQA_passages/EVQA_passages"
 
+image_processor_name = '/mydata/clip-vit-large-patch14'
+checkpoint_path = '/mydata/PreFLMR_ViT-L'
+flmr_config = FLMRConfig.from_pretrained(checkpoint_path)
+query_tokenizer = FLMRQueryEncoderTokenizer.from_pretrained(checkpoint_path,
+                                                                text_config=flmr_config.text_config,
+                                                                subfolder="query_tokenizer")
+image_processor = AutoImageProcessor.from_pretrained(image_processor_name)
 # Load the primary dataset for queries
 ds = load_dataset(
     "parquet",
@@ -48,10 +109,19 @@ ds = load_dataset(
         "train": os.path.join(ds_dir, "train-00000-of-00001.parquet"),
         "test": os.path.join(ds_dir, "test-00000-of-00001-2.parquet"),
     },
-)[use_split]
+)[use_split].select(range(1000))
 ds = ds.map(add_path_prefix_in_img_path, fn_kwargs={"prefix": image_root_dir})
+ds = ds.map(prepare_inputs, fn_kwargs={"config": flmr_config})
+    #print("tokenizing inputs")
+ds = ds.map(
+    tokenize_inputs,
+    fn_kwargs={"query_tokenizer": query_tokenizer, "image_processor": image_processor},
+    batched=True,
+    batch_size=16,
+    num_proc=1,
+)
 print("Dataset length:", len(ds))
-print("First example:", ds[0])
+#print("First example:", ds[0])
 # Uncomment the next line if you want to process images into bytes:
 # ds = ds.map(process_image)
 
@@ -111,6 +181,8 @@ class EVQAUser(HttpUser):
         # Choose a random example from the dataset
         idx = random.randint(0, len(ds) - 1)
         data = ds[idx]
+        #print(data['pixel_values'])
+        data = convert_to_numpy(data)
         max_retries = 3
 
         for attempt in range(1, max_retries + 1):
