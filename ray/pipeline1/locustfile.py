@@ -15,11 +15,18 @@ from flmr import (
 )
 from torch.utils.data import DataLoader
 from transformers import AutoImageProcessor
+import pickle
+import string
+from tqdm import tqdm
 # Global configuration and helper functions
-DATA_DIR = "/mydata"
 
+SELECT_DS = range(1000)  
+DATA_DIR = "/mydata"
 hosts = [
-        "http://10.10.1.13:8000"
+        "http://10.10.1.13:8000",
+        "http://10.10.1.12:8000",
+        "http://10.10.1.11:8000",
+        "http://10.10.1.10:8000"
     ]
 def get_random_host():
         """Return a randomly selected host from the list."""
@@ -89,6 +96,11 @@ def convert_to_numpy(example):
     #example["pixel_values"] = example["pixel_values"].numpy().tolist()
     return example
 
+def generate_bytes(example):
+    data_bytes = pickle.dumps(example, protocol=pickle.HIGHEST_PROTOCOL)
+    example["data_bytes"] = data_bytes
+    return example
+
 # Dataset directories and loading
 image_root_dir = f"{DATA_DIR}/EVQA"
 use_split = "train"
@@ -109,10 +121,10 @@ ds = load_dataset(
         "train": os.path.join(ds_dir, "train-00000-of-00001.parquet"),
         "test": os.path.join(ds_dir, "test-00000-of-00001-2.parquet"),
     },
-)[use_split].select(range(1000))
+)[use_split].select(SELECT_DS)
 ds = ds.map(add_path_prefix_in_img_path, fn_kwargs={"prefix": image_root_dir})
 ds = ds.map(prepare_inputs, fn_kwargs={"config": flmr_config})
-    #print("tokenizing inputs")
+print("tokenizing inputs")
 ds = ds.map(
     tokenize_inputs,
     fn_kwargs={"query_tokenizer": query_tokenizer, "image_processor": image_processor},
@@ -120,6 +132,9 @@ ds = ds.map(
     batch_size=16,
     num_proc=1,
 )
+print("generating bytes")
+#ds = ds.map(generate_bytes)
+
 print("Dataset length:", len(ds))
 #print("First example:", ds[0])
 # Uncomment the next line if you want to process images into bytes:
@@ -139,6 +154,15 @@ total_queries = 0
 correct_queries = 0
 counter_lock = threading.Lock()
 
+bytes_to_send = []
+for i in tqdm(range(len(ds)), desc="Preparing bytes to send"):
+    data = ds[i]
+    requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+    data['requestid'] = requestid
+    #data_bytes = data['data_bytes']
+    data_bytes = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+    bytes_to_send.append((data_bytes, requestid))
+    
 
 def check_answer(data, answer):
     """
@@ -179,14 +203,14 @@ class EVQAUser(HttpUser):
         global total_queries, correct_queries
 
         # Choose a random example from the dataset
-        idx = random.randint(0, len(ds) - 1)
-        data = ds[idx]
+        idx = random.randint(0, len(bytes_to_send) - 1)
+        data = bytes_to_send[idx][0]
         #print(data['pixel_values'])
-        data = convert_to_numpy(data)
+        #data = convert_to_numpy(data)
         max_retries = 3
-
+        headers = {'Content-Type': 'application/octet-stream'}
         for attempt in range(1, max_retries + 1):
-            with self.client.post(f"{get_random_host()}/", json=data, catch_response=True) as response:
+            with self.client.post(f"{get_random_host()}/", data=data, headers=headers, catch_response=True) as response:
                 try:
                     response.raise_for_status()  # Raises exception for 4xx/5xx responses
                     output = response.json()
@@ -196,13 +220,13 @@ class EVQAUser(HttpUser):
                     response.success()
                     # Check the answer and update global counters
                     if False:
-                        is_correct = check_answer(data, output)
+                        is_correct = check_answer(ds[idx], output)
                         with counter_lock:
                             total_queries += 1
                             if is_correct:
                                 correct_queries += 1
                         # Optionally print per-query result
-                        print(f"Query idx {idx} processed. Correct: {is_correct}. Response time: {response.elapsed.total_seconds()} s")
+                        #print(f"Query idx {idx} processed. Correct: {is_correct}. Response time: {response.elapsed.total_seconds()} s")
                     break  # Exit retry loop on success
                 except Exception as e:
                     response.failure(f"Attempt {attempt} failed: {e}")

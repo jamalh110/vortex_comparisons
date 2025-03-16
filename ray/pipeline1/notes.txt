@@ -55,6 +55,10 @@ sudo nvidia-smi -i 0 -mig 1
 sudo reboot
 sudo nvidia-smi mig -i 0 -cgi 1g.6gb -C
 use nvidia-smi -L to get UUIDs
+
+to delete, 
+
+
 run ray like so:
 CUDA_VISIBLE_DEVICES=MIG-efb9cd1f-5a0f-569b-98b3-d0ea501d8c4e,MIG-5dfdb424-8448-5ca7-a15e-75706b8d5ab6,MIG-2c1b2fae-443c-5fa4-8530-ee9471c2d057,MIG-f845e8ee-9f2a-5a0d-991e-707536011766  ray start --address 10.10.1.13:6379 --node-ip-address 10.10.1.10 --num-gpus=4 --resources='{"deploy_e": 4}'
 
@@ -62,7 +66,7 @@ To deploy ray serve:
 serve shutdown -y && serve deploy serve_config.yaml
 
 LOCUST:
-sudo /users/jamalh11/.local/bin/locust -f locustfile.py --users 1 --spawn-rate 2 --headless -H http://10.10.1.4:8000
+HF_DATASETS_CACHE=/mydata/datasets_cache locust -f locustfile.py --users 1 --spawn-rate 2 --headless -H http://10.10.1.4:8000
 
 Try this to fix random hanging process issue:
 RAY_kill_child_processes_on_worker_exit_with_raylet_subreaper=true

@@ -92,10 +92,10 @@ applications:
             COLBERT_LOAD_TORCH_EXTENSION_VERBOSE: "True"
 
   - name: Ingress
-    num_replicas: 8
-    max_ongoing_requests: 200
+    num_replicas: 16
+    max_ongoing_requests: 100
     ray_actor_options:
-      num_cpus: 2.0
+      num_cpus: 1.0
       num_gpus: 0
     logging_config:
       log_level: DEBUG

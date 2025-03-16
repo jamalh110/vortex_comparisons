@@ -1,5 +1,8 @@
+import logging
+import pickle
 import random
 import string
+import time
 from typing import Dict, List
 from starlette.requests import Request
 from ray.serve.handle import DeploymentHandle
@@ -19,13 +22,23 @@ from flmr import (
 )
 from PIL import Image
 from flmr import create_searcher, search_custom_collection
+from utils import make_logger, logfunc
+import os
+import multiprocessing as mp
+from functools import partial
 
 _MAX_BATCH_SIZE = 32
 DATA_DIR="/mydata"
+LOG_DIR = "/users/jamalh11/raylogs"
+def process_input(input_data):
+    return pickle.loads(input_data)
 
 @serve.deployment
 class Monolith:
     def __init__(self, experiment_name: str, index_name):
+        self.logger = make_logger(os.getpid(), "Monolith", LOG_DIR)
+        self.logger.setLevel(logging.INFO)
+
         self.index_root_path        = f'{DATA_DIR}/EVQA/index/'
         self.index_name             = index_name
         self.index_experiment_name  = experiment_name
@@ -115,21 +128,40 @@ class Monolith:
         # Forward the vision encoder
         pixel_values = pixel_values.to(self.device)
         return pixel_values
+    
+    
+    async def process_all_inputs(self, http_request):
+         
+        # First gather all inputs asynchronously
+        inputs = [await i.body() for i in http_request]
+        
+        # Then process them in parallel
+        with mp.Pool(processes=32) as pool:
+            input_jsons = pool.map(process_input, inputs)
+        
+        return input_jsons
 
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, http_request: List[Request]):
-        
-        input_jsons = [await i.json() for i in http_request]
-        
+
+        #input_jsons = [await i.json() for i in http_request]
+        start = time.time()
+        #inputs = [await i.body() for i in http_request]
+        #input_jsons = [pickle.loads(i) for i in inputs]
+        input_jsons = await self.process_all_inputs(http_request)
+
+        print(f"Time to load images: {time.time()-start} batch {len(input_jsons)}")
+        logfunc(self.logger, input_jsons, "Monolith_Enter")
         bsize               = None
 
-        image_paths = [i["img_path"] for i in input_jsons]
+        #image_paths = [i["img_path"] for i in input_jsons]
         question_ids = [i["question_id"] for i in input_jsons]
         questions = [i["question"] for i in input_jsons]
 
-        text_sequences = [self.prepare_inputs(i)["text_sequence"] for i in input_jsons]
-        pixel_values = self.process_images(image_paths)
-
+        #text_sequences = [self.prepare_inputs(i)["text_sequence"] for i in input_jsons]
+        #pixel_values = self.process_images(image_paths)
+        text_sequences = [i["text_sequence"] for i in input_jsons]
+        pixel_values = torch.stack([torch.tensor(i["pixel_values"]) for i in input_jsons], dim=0).to(self.device)
 
         encoding = self.query_tokenizer(text_sequences)
         input_ids = torch.LongTensor(encoding["input_ids"]).to(self.device)
@@ -158,6 +190,7 @@ class Monolith:
         ret = []
         for id in question_ids:
             ret.append(ranking[id])
+        logfunc(self.logger, input_jsons, "Monolith_Exit")
         return ret
 
 

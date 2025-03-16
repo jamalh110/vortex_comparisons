@@ -8,6 +8,7 @@ import requests
 from datasets import load_dataset
 import os 
 from PIL import Image
+from tqdm import tqdm
 from utils import make_logger
 from easydict import EasyDict
 import torch
@@ -17,10 +18,24 @@ from flmr import (
 )
 from torch.utils.data import DataLoader
 from transformers import AutoImageProcessor
+import aiohttp
+import asyncio
 
 
 LOGGING_DIR = "/users/jamalh11/raylogs"
 DATA_DIR = "/mydata"
+
+hosts = [
+        "http://10.10.1.13:8000",
+        "http://10.10.1.12:8000",
+        "http://10.10.1.11:8000",
+        "http://10.10.1.10:8000"
+    ]
+session = None
+
+def get_random_host():
+        """Return a randomly selected host from the list."""
+        return random.choice(hosts)
 
 def add_path_prefix_in_img_path(example, prefix):
     if example["img_path"] != None:
@@ -101,10 +116,42 @@ def request_task(url, data_bytes):
     headers = {'Content-Type': 'application/octet-stream'}
     response = requests.post(url, data=data_bytes, headers=headers)
 
+def request_task_sync(url, data_bytes):
+    headers = {'Content-Type': 'application/octet-stream'}
+    response = requests.post(url, data=data_bytes, headers=headers)
+
+    return response
 
 def fire_and_forget(url, data_bytes):
     threading.Thread(target=request_task, args=(url, data_bytes)).start()
     
+async def async_request_task(url, data_bytes):
+    """Asynchronous function to send a request"""
+    global session
+    if session is None:
+        session = aiohttp.ClientSession()
+    
+    headers = {'Content-Type': 'application/octet-stream'}
+    try:
+        async with session.post(url, data=data_bytes, headers=headers) as response:
+            # You can await the response if you need it
+            # result = await response.json()
+            pass
+    except Exception as e:
+        print(f"Error in async request: {e}")
+
+def fire_and_forget2(url, data_bytes):
+    """Non-blocking function to fire a request without waiting for response"""
+    # Get the current event loop or create a new one
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        # If no event loop exists in this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    # Schedule the coroutine to run soon and return immediately
+    asyncio.create_task(async_request_task(url, data_bytes))
 
 
 if __name__ == "__main__":
@@ -125,7 +172,7 @@ if __name__ == "__main__":
     ds = load_dataset('parquet', data_files ={  
                                                 'train' : ds_dir + '/train-00000-of-00001.parquet',
                                                 'test'  : ds_dir + '/test-00000-of-00001-2.parquet',
-                                                })[use_split].select(range(1000))
+                                                })[use_split].select(range(164000, 167000))
 
 
 
@@ -180,7 +227,7 @@ if __name__ == "__main__":
         print("TOTAL TIME:", time.time()-totaltimestart)
         print(output)
     
-    onecall()
+    #onecall()
     
 
     
@@ -188,23 +235,30 @@ if __name__ == "__main__":
     #exit(0)
     #print(ds['question_id'])
     #exit(0)
-    nqueries = 100
+    nqueries = 3000
     max_retries = 3
     answers = []
     bytes_to_send = []
-    for i in range(nqueries):
-        data = ds[i]
-        requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
-        data['requestid'] = requestid
-        data_bytes = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
-        bytes_to_send.append((data_bytes, requestid))
-    
+    file_path = "/mydata/ds_test.pkl"
+    if not os.path.exists(file_path):
+        for i in tqdm(range(nqueries), desc="Preparing bytes to send"):
+            data = ds[i]
+            requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+            data['requestid'] = requestid
+            data_bytes = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+            bytes_to_send.append((data_bytes, requestid))
+        
+        with open(file_path, "wb") as file:
+            pickle.dump(bytes_to_send, file)
+    else:
+        with open(file_path, "rb") as file:
+            bytes_to_send = pickle.load(file)
+        
     totaltimestart = time.time()
-
-    
-
-    for req in bytes_to_send:
-
+    rate = 1/90
+    seconds = 100
+    for i in range(int(seconds/rate)):
+        req = bytes_to_send[i%len(bytes_to_send)]
         #print(batch['text_sequence'], batch['question'])
         #data = convert_to_numpy(batch)
         # data = batch
@@ -222,45 +276,39 @@ if __name__ == "__main__":
         logger.info(f"Client_Send {requestid}")
         for attempt in range(1, max_retries + 1):
             try:
-                fire_and_forget("http://127.0.0.1:8000/", data)
-                #response = requests.post("http://127.0.0.1:8000/", json=data)
+                fire_and_forget(get_random_host(), data)
+
+                # response = request_task_sync("http://127.0.0.1:8000/", data)
                 # response.raise_for_status()  # Raise an exception for HTTP error codes
                 # output = response.json()
                 # if(output[0] == "error"):
-                #     print("Error in query", batch_idx)
+                #     print("Error in query", requestid)
                 #     raise Exception("Error in query")
                 # logger.info(f"Client_Rec {requestid}")
                 # #print(output)
-                # print("Request",batch_idx,"took", response.elapsed.total_seconds(), "seconds")
+                # print("Request",requestid,"took", response.elapsed.total_seconds(), "seconds")
                 # answers.append(output)
                 break  # Exit the retry loop if the request was successful
             except (requests.RequestException, json.JSONDecodeError, Exception) as e:
-                print(f"Attempt {attempt} failed for query {batch_idx}: {e}")
+                print(f"Attempt {attempt} failed for query {requestid}: {e}")
                 if attempt == max_retries:
-                    print("Max retries reached for query", batch_idx)
+                    print("Max retries reached for query", requestid)
                     exit(1)
                 else:
                     # Optionally add a delay before retrying
                     time.sleep(1)
-        time.sleep(0.5)
-
-
-
-
-
-
-
-
+        time.sleep(rate)
 
 
     print("TOTAL TIME:", time.time()-totaltimestart)
+    exit(0)
     passages_ds = load_dataset('parquet', data_files ={  
                                                 'train' : p_ds_dir + '/train_passages-00000-of-00001.parquet',
                                                 'test'  : p_ds_dir + '/test_passages-00000-of-00001.parquet',
                                                 })[use_split]
 
     correct = 0
-    for i in range(nqueries):
+    for i in range(int(seconds/rate)):
         data = ds[i]
         correct_passage = data['pos_item_ids']
         if(len(correct_passage)!= 1):

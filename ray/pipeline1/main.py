@@ -344,7 +344,7 @@ class Ingress:
             image = {"pixel_values": np.array(input['pixel_values'])}
             image['requestid'] = requestid
 
-            stepA_output = self.stepA.remote(input)
+            stepA_output = self.stepA.remote({"requestid": requestid, "text_sequence": input['text_sequence']})
             stepB_output = self.stepB.remote(image)    
             output_b_raw = await stepB_output
             #output_b_raw['requestid'] = requestid
