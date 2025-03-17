@@ -21,7 +21,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoImageProcessor
 import aiohttp
 import asyncio
-
+import numpy as np
 from types import ModuleType, FunctionType
 from gc import get_referents
 
@@ -115,18 +115,18 @@ def convert_to_numpy_map(example):
     example["pixel_values"] = example["pixel_values"].numpy().tolist()
     return example
 
-def request_task(url, data_bytes):
-    headers = {'Content-Type': 'application/octet-stream'}
+def request_task(url, data_bytes, requestid):
+    headers = {'Content-Type': 'application/octet-stream', "x-requestid": requestid}
     response = requests.post(url, data=data_bytes, headers=headers)
 
-def request_task_sync(url, data_bytes):
-    headers = {'Content-Type': 'application/octet-stream'}
+def request_task_sync(url, data_bytes, requestid):
+    headers = {'Content-Type': 'application/octet-stream', "x-requestid": requestid}
     response = requests.post(url, data=data_bytes, headers=headers)
 
     return response
 
-def fire_and_forget(url, data_bytes):
-    threading.Thread(target=request_task, args=(url, data_bytes)).start()
+def fire_and_forget(url, data_bytes, requestid):
+    threading.Thread(target=request_task, args=(url, data_bytes, requestid)).start()
     
 async def async_request_task(url, data_bytes):
     """Asynchronous function to send a request"""
@@ -265,8 +265,23 @@ if __name__ == "__main__":
             data = ds[i]
             requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
             data['requestid'] = requestid
-            data_bytes = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+            datatosend = {
+                #"question": data["question"],
+                "question_id": data["question_id"],
+                "text_sequence": data["text_sequence"],
+                "pixel_values": (np.array(data["pixel_values"])),
+                "input_ids": (np.array(data["input_ids"])),
+                "attention_mask": (np.array(data["attention_mask"])),
+                "requestid": requestid
+            }
+            data_bytes = pickle.dumps(datatosend, protocol=pickle.HIGHEST_PROTOCOL)
             bytes_to_send.append((data_bytes, requestid))
+
+            # data = ds[i]
+            # requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+            # data['requestid'] = requestid
+            # data_bytes = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+            # bytes_to_send.append((data_bytes, requestid))
         
         with open(file_path, "wb") as file:
             pickle.dump(bytes_to_send, file)
@@ -275,12 +290,21 @@ if __name__ == "__main__":
             bytes_to_send = pickle.load(file)
         
     totaltimestart = time.time()
-    rate = 1/32
-    seconds = 100
+    rate = 1/16
+    seconds = 20
+    est_queries = int(seconds/rate * 1.2)
+
+    bytes_to_send_extended = []
+    for i in range(est_queries):
+        requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        bytes = bytes_to_send[i%len(bytes_to_send)][0]
+        bytes_to_send_extended.append((bytes, requestid))
+
+    bytes_to_send = bytes_to_send_extended
     test = "FF"
     #test = "SYNC"
     for i in range(int(seconds/rate)):
-        req = bytes_to_send[i%len(bytes_to_send)]
+        req = bytes_to_send[i]
         #print(getsize(req))
         #print(batch['text_sequence'], batch['question'])
         #data = convert_to_numpy(batch)
@@ -300,9 +324,9 @@ if __name__ == "__main__":
         for attempt in range(1, max_retries + 1):
             try:
                 if test == "FF":
-                    fire_and_forget(get_random_host(), data)
+                    fire_and_forget(get_random_host(), data, requestid=requestid)
                 if test == "SYNC":
-                    response = request_task_sync("http://127.0.0.1:8000/", data)
+                    response = request_task_sync("http://127.0.0.1:8000/", data, requestid)
                     response.raise_for_status()  # Raise an exception for HTTP error codes
                     output = response.json()
                     if(output[0] == "error"):
@@ -325,7 +349,8 @@ if __name__ == "__main__":
 
 
     print("TOTAL TIME:", time.time()-totaltimestart)
-    exit(0)
+    if test == "FF":
+        exit(0)
     passages_ds = load_dataset('parquet', data_files ={  
                                                 'train' : p_ds_dir + '/train_passages-00000-of-00001.parquet',
                                                 'test'  : p_ds_dir + '/test_passages-00000-of-00001.parquet',
@@ -346,4 +371,4 @@ if __name__ == "__main__":
             if correct_passage in passage['passage_id']:
                 correct += 1
                 break
-    print(correct, "out of", nqueries, "correct")
+    print(correct, "out of", int(seconds/rate), "correct")

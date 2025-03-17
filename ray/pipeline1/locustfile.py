@@ -18,9 +18,10 @@ from transformers import AutoImageProcessor
 import pickle
 import string
 from tqdm import tqdm
+import numpy as np
 # Global configuration and helper functions
 
-SELECT_DS = range(1000)  
+SELECT_DS = range(164000, 167000)  
 DATA_DIR = "/mydata"
 hosts = [
         "http://10.10.1.13:8000",
@@ -166,11 +167,20 @@ counter_lock = threading.Lock()
 bytes_to_send = []
 file_path = "/mydata/ds_test.pkl"
 if not os.path.exists(file_path):
-    for i in tqdm(SELECT_DS, desc="Preparing bytes to send"):
+    for i in tqdm(range(len(ds)), desc="Preparing bytes to send"):
         data = ds[i]
         requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
         data['requestid'] = requestid
-        data_bytes = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+        datatosend = {
+            #"question": data["question"],
+            "question_id": data["question_id"],
+            "text_sequence": data["text_sequence"],
+            "pixel_values": (np.array(data["pixel_values"])),
+            "input_ids": (np.array(data["input_ids"])),
+            "attention_mask": (np.array(data["attention_mask"])),
+            "requestid": requestid
+        }
+        data_bytes = pickle.dumps(datatosend, protocol=pickle.HIGHEST_PROTOCOL)
         bytes_to_send.append((data_bytes, requestid))
     
     with open(file_path, "wb") as file:
@@ -223,7 +233,8 @@ class EVQAUser(HttpUser):
         #print(data['pixel_values'])
         #data = convert_to_numpy(data)
         max_retries = 3
-        headers = {'Content-Type': 'application/octet-stream'}
+        requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        headers = {'Content-Type': 'application/octet-stream', "x-requestid": requestid}
         for attempt in range(1, max_retries + 1):
             with self.client.post(f"{get_random_host()}/", data=data, headers=headers, catch_response=True) as response:
                 try:

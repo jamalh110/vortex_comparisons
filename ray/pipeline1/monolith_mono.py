@@ -143,29 +143,39 @@ class Monolith:
 
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, http_request: List[Request]):
-
+        requestids = [{"requestid": i.headers["x-requestid"]} for i in http_request]
+        #requestids = requestids.map(lambda x: {"requestid": x})
+        logfunc(self.logger, requestids, "Monolith_Enter")
         #input_jsons = [await i.json() for i in http_request]
-        start = time.time()
+        #start = time.time()
         inputs = [await i.body() for i in http_request]
         input_jsons = [pickle.loads(i) for i in inputs]
         #input_jsons = await self.process_all_inputs(http_request)
 
-        print(f"Time to load images: {time.time()-start} batch {len(input_jsons)}")
-        logfunc(self.logger, input_jsons, "Monolith_Enter")
+        #print(f"Time to load images: {time.time()-start} batch {len(input_jsons)}")
+        
         bsize               = None
 
         #image_paths = [i["img_path"] for i in input_jsons]
         question_ids = [i["question_id"] for i in input_jsons]
-        questions = [i["question"] for i in input_jsons]
+        #questions = [i["question"] for i in input_jsons]
 
         #text_sequences = [self.prepare_inputs(i)["text_sequence"] for i in input_jsons]
         #pixel_values = self.process_images(image_paths)
         text_sequences = [i["text_sequence"] for i in input_jsons]
-        pixel_values = torch.stack([torch.from_numpy(np.array(i["pixel_values"])) for i in input_jsons], dim=0).to(self.device)
 
-        encoding = self.query_tokenizer(text_sequences)
-        input_ids = torch.LongTensor(encoding["input_ids"]).to(self.device)
-        attention_mask = torch.LongTensor(encoding["attention_mask"]).to(self.device)
+        pixel_values = torch.stack([torch.from_numpy(i["pixel_values"]) for i in input_jsons], dim=0).to(self.device)
+        input_ids = torch.stack([torch.from_numpy(i["input_ids"]) for i in input_jsons], dim=0).to(self.device)
+        attention_mask = torch.stack([torch.from_numpy(i["attention_mask"]) for i in input_jsons], dim=0).to(self.device)
+
+        # pixel_values = torch.stack([i["pixel_values"] for i in input_jsons], dim=0).to(self.device)
+        # input_ids = torch.stack([i["input_ids"] for i in input_jsons], dim=0).to(self.device)
+        # attention_mask = torch.stack([i["attention_mask"] for i in input_jsons], dim=0).to(self.device)    
+
+        #encoding = self.query_tokenizer(text_sequences)
+        #input_ids = torch.LongTensor(encoding["input_ids"]).to(self.device)
+        #attention_mask = torch.LongTensor(encoding["attention_mask"]).to(self.device)
+
         query_input = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
@@ -176,7 +186,7 @@ class Monolith:
         #query_embeddings = query_embeddings.detach().cpu()
 
         queries = {
-            question_id: question for question_id, question in zip(question_ids, questions)
+            question_id: question for question_id, question in zip(question_ids, text_sequences)
         } 
 
         ranking = search_custom_collection(
@@ -190,7 +200,7 @@ class Monolith:
         ret = []
         for id in question_ids:
             ret.append(ranking[id])
-        logfunc(self.logger, input_jsons, "Monolith_Exit")
+        logfunc(self.logger, requestids, "Monolith_Exit")
         return ret
 
 
