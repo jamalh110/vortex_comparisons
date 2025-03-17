@@ -31,7 +31,7 @@ applications:
   route_prefix: /
 
   #import_path: monolith_imgpath:app
-  import_path: monolith:app
+  import_path: monolith_mono:app
 
   args:
     experiment_name: EVQA_train_split/
@@ -47,15 +47,6 @@ applications:
     ray_actor_options:
       num_cpus: 8.0
       num_gpus: 1.0
-      runtime_env:
-          env_vars:
-            COLBERT_LOAD_TORCH_EXTENSION_VERBOSE: "True"
-
-  - name: Ingress
-    num_replicas: 16
-    max_ongoing_requests: 100
-    ray_actor_options:
-      num_cpus: 2.0
       runtime_env:
           env_vars:
             COLBERT_LOAD_TORCH_EXTENSION_VERBOSE: "True"

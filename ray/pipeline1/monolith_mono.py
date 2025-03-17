@@ -1,10 +1,9 @@
-import asyncio
 import logging
 import pickle
 import random
 import string
 import time
-from typing import Any, Dict, List
+from typing import Dict, List
 from starlette.requests import Request
 from ray.serve.handle import DeploymentHandle
 from ray.serve import Application
@@ -28,10 +27,9 @@ import os
 import multiprocessing as mp
 from functools import partial
 
-_MAX_BATCH_SIZE = 16
+_MAX_BATCH_SIZE = 32
 DATA_DIR="/mydata"
 LOG_DIR = "/users/jamalh11/raylogs"
-
 def process_input(input_data):
     return pickle.loads(input_data)
 
@@ -60,8 +58,6 @@ class Monolith:
 
         self.load_model_cpu()
         self.load_model_gpu()
-
-        self.process_pool = mp.Pool(processes=32)
 
     def load_model_cpu(self):
         self.flmr_config = FLMRConfig.from_pretrained(self.checkpoint_path)
@@ -134,39 +130,28 @@ class Monolith:
         return pixel_values
     
     
-    # async def process_all_inputs(self, http_request):
+    async def process_all_inputs(self, http_request):
          
-    #     # First gather all inputs asynchronously
-    #     start = time.time()
-    #     inputs = [await i.body() for i in http_request]
-    #     print(f"Time to get bodies: {time.time()-start} batch {len(inputs)}")
-    #     # Then process them in parallel
-    #     # with mp.Pool(processes=32) as pool:
-    #     #     input_jsons = pool.map(process_input, inputs)
+        # First gather all inputs asynchronously
+        inputs = [await i.body() for i in http_request]
         
-    #     # return input_jsons
-
-    #     loop = asyncio.get_event_loop()
-    #     input_jsons = await loop.run_in_executor(
-    #         None, 
-    #         lambda: list(self.process_pool.map(process_input, inputs))
-    #     )
-    
-    #     return input_jsons
+        # Then process them in parallel
+        with mp.Pool(processes=32) as pool:
+            input_jsons = pool.map(process_input, inputs)
+        
+        return input_jsons
 
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
-    async def __call__(self, input_jsons: Any):
+    async def __call__(self, http_request: List[Request]):
 
         #input_jsons = [await i.json() for i in http_request]
-        #start = time.time()
-        #inputs = [await i.body() for i in http_request]
-        #input_jsons = [pickle.loads(i) for i in inputs]
+        start = time.time()
+        inputs = [await i.body() for i in http_request]
+        input_jsons = [pickle.loads(i) for i in inputs]
         #input_jsons = await self.process_all_inputs(http_request)
 
-        #print(f"Time to load images: {time.time()-start} batch {len(input_jsons)}")
-        #input_jsons = ray.get(input_jsons_refs)
+        print(f"Time to load images: {time.time()-start} batch {len(input_jsons)}")
         logfunc(self.logger, input_jsons, "Monolith_Enter")
-
         bsize               = None
 
         #image_paths = [i["img_path"] for i in input_jsons]
@@ -176,11 +161,7 @@ class Monolith:
         #text_sequences = [self.prepare_inputs(i)["text_sequence"] for i in input_jsons]
         #pixel_values = self.process_images(image_paths)
         text_sequences = [i["text_sequence"] for i in input_jsons]
-
-        start = time.time()
-        #pixel_values = torch.stack([torch.tensor(i["pixel_values"]) for i in input_jsons], dim=0).to(self.device)
-        pixel_values = torch.stack([torch.from_numpy(i["pixel_values"]) for i in input_jsons], dim=0).to(self.device)
-        print(f"Time to load images: {time.time()-start} batch {len(input_jsons)}")
+        pixel_values = torch.stack([torch.from_numpy(np.array(i["pixel_values"])) for i in input_jsons], dim=0).to(self.device)
 
         encoding = self.query_tokenizer(text_sequences)
         input_ids = torch.LongTensor(encoding["input_ids"]).to(self.device)
@@ -212,40 +193,9 @@ class Monolith:
         logfunc(self.logger, input_jsons, "Monolith_Exit")
         return ret
 
-@serve.deployment
-class Ingress:
-    def __init__(self, monolith: DeploymentHandle):
-        self.monolith = monolith
-        self.logger = make_logger(os.getpid(), "Ingress", LOG_DIR)
-        self.logger.setLevel(logging.INFO)
-
-        
-    async def __call__(self, http_request: Request):
-        try:
-            requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-            
-            input = await http_request.body()
-            input = pickle.loads(input)
-            requestid = input.get('requestid', requestid)
-            logfunc(self.logger, [{"requestid": requestid}], "Ingress_Enter")
-            #ref = ray.put(input)
-            input['pixel_values'] = np.array(input['pixel_values'])
-            ret = await self.monolith.remote(input)
-            #del ref
-            
-            #ret = await self.monolith.remote(input)
-            logfunc(self.logger, [{"requestid": requestid}], "Ingress_Exit")
-            return ret
-        
-        except Exception as e:
-            print("\n\n\n\n ERROR:", e, "\n\n\n\n")
-            return ["error"]
-
-
 
 def app(args: Dict[str, str]) -> Application:
     experiment_name = args.get("experiment_name", "EVQA_train_split/")
     index_name = args.get("index_name", "EVQA_PreFLMR_ViT-L")
     handle: DeploymentHandle =  Monolith.bind(experiment_name=experiment_name, index_name=index_name)
-    ingress_handle: DeploymentHandle = Ingress.bind(monolith=handle)
-    return ingress_handle
+    return handle

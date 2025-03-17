@@ -169,18 +169,14 @@ class Monolith:
 
         bsize               = None
 
-        #image_paths = [i["img_path"] for i in input_jsons]
+        image_paths = [i["img_path"] for i in input_jsons]
         question_ids = [i["question_id"] for i in input_jsons]
         questions = [i["question"] for i in input_jsons]
 
         #text_sequences = [self.prepare_inputs(i)["text_sequence"] for i in input_jsons]
         #pixel_values = self.process_images(image_paths)
         text_sequences = [i["text_sequence"] for i in input_jsons]
-
-        start = time.time()
-        #pixel_values = torch.stack([torch.tensor(i["pixel_values"]) for i in input_jsons], dim=0).to(self.device)
-        pixel_values = torch.stack([torch.from_numpy(i["pixel_values"]) for i in input_jsons], dim=0).to(self.device)
-        print(f"Time to load images: {time.time()-start} batch {len(input_jsons)}")
+        pixel_values = torch.stack([torch.from_numpy(i["pixel_values"]) for i in input_jsons]).to(self.device)
 
         encoding = self.query_tokenizer(text_sequences)
         input_ids = torch.LongTensor(encoding["input_ids"]).to(self.device)
@@ -214,8 +210,55 @@ class Monolith:
 
 @serve.deployment
 class Ingress:
+
+    def prepare_inputs(self, sample):
+        sample = EasyDict(sample)
+
+        module = EasyDict(
+            {"type": "QuestionInput", "option": "default", "separation_tokens": {"start": "", "end": ""}}
+        )
+
+        instruction = sample.instruction.strip()
+        if instruction[-1] != ":":
+            instruction = instruction + ":"
+        instruction = instruction.replace(":", self.flmr_config.mask_instruction_token)
+        #random_instruction = random.choice(instructions)
+        text_sequence = " ".join(
+            [instruction]
+            + [module.separation_tokens.start]
+            + [sample.question]
+            + [module.separation_tokens.end]
+        )
+
+        sample["text_sequence"] = text_sequence
+
+        return sample
+    
+    def process_images(self, list_of_images):
+        pixel_values = []
+        # for imgbytes in list_of_images:
+        #     img = Image.open(io.BytesIO(imgbytes)).convert("RGB")
+        #     encoded = self.image_processor(img, return_tensors="pt")
+        #     pixel_values.append(encoded.pixel_values)
+    
+        for img_path in list_of_images:
+            if img_path is None:
+                image = Image.new("RGB", (336, 336), color='black')
+            else:
+                image = Image.open(img_path).convert("RGB")
+            encoded = self.image_processor(image, return_tensors="pt")
+            pixel_values.append(encoded.pixel_values)
+        pixel_values = torch.stack(pixel_values, dim=0)
+        #print("here1")
+        batch_size = pixel_values.shape[0]
+        # Forward the vision encoder
+        #pixel_values = pixel_values.to(self.device)
+        return pixel_values.numpy()
+    
     def __init__(self, monolith: DeploymentHandle):
         self.monolith = monolith
+        self.image_processor = AutoImageProcessor.from_pretrained(f'{DATA_DIR}/clip-vit-large-patch14')
+        self.flmr_config = FLMRConfig.from_pretrained(f'{DATA_DIR}/PreFLMR_ViT-L')
         self.logger = make_logger(os.getpid(), "Ingress", LOG_DIR)
         self.logger.setLevel(logging.INFO)
 
@@ -223,15 +266,20 @@ class Ingress:
     async def __call__(self, http_request: Request):
         try:
             requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-            
-            input = await http_request.body()
-            input = pickle.loads(input)
+            input = await http_request.json()
             requestid = input.get('requestid', requestid)
+            input['requestid'] = requestid
+
+            image_path = input['img_path']
+            input = self.prepare_inputs(input)
+            pixel_values = self.process_images([image_path])[0]
+            #input['text_sequence'] = text_sequence
+            input['pixel_values'] = pixel_values
+
             logfunc(self.logger, [{"requestid": requestid}], "Ingress_Enter")
-            #ref = ray.put(input)
-            input['pixel_values'] = np.array(input['pixel_values'])
+
+
             ret = await self.monolith.remote(input)
-            #del ref
             
             #ret = await self.monolith.remote(input)
             logfunc(self.logger, [{"requestid": requestid}], "Ingress_Exit")

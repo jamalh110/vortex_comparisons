@@ -2,6 +2,7 @@ import json
 import pickle
 import random
 import string
+import sys
 import threading
 import time
 import requests
@@ -21,6 +22,8 @@ from transformers import AutoImageProcessor
 import aiohttp
 import asyncio
 
+from types import ModuleType, FunctionType
+from gc import get_referents
 
 LOGGING_DIR = "/users/jamalh11/raylogs"
 DATA_DIR = "/mydata"
@@ -153,6 +156,23 @@ def fire_and_forget2(url, data_bytes):
     # Schedule the coroutine to run soon and return immediately
     asyncio.create_task(async_request_task(url, data_bytes))
 
+BLACKLIST = type, ModuleType, FunctionType
+def getsize(obj):
+    """sum size of object & members."""
+    if isinstance(obj, BLACKLIST):
+        raise TypeError('getsize() does not take argument of type: '+ str(type(obj)))
+    seen_ids = set()
+    size = 0
+    objects = [obj]
+    while objects:
+        need_referents = []
+        for obj in objects:
+            if not isinstance(obj, BLACKLIST) and id(obj) not in seen_ids:
+                seen_ids.add(id(obj))
+                size += sys.getsizeof(obj)
+                need_referents.append(obj)
+        objects = get_referents(*need_referents)
+    return size
 
 if __name__ == "__main__":
     image_root_dir = f"{DATA_DIR}/EVQA"
@@ -255,10 +275,13 @@ if __name__ == "__main__":
             bytes_to_send = pickle.load(file)
         
     totaltimestart = time.time()
-    rate = 1/90
+    rate = 1/32
     seconds = 100
+    test = "FF"
+    #test = "SYNC"
     for i in range(int(seconds/rate)):
         req = bytes_to_send[i%len(bytes_to_send)]
+        #print(getsize(req))
         #print(batch['text_sequence'], batch['question'])
         #data = convert_to_numpy(batch)
         # data = batch
@@ -276,18 +299,19 @@ if __name__ == "__main__":
         logger.info(f"Client_Send {requestid}")
         for attempt in range(1, max_retries + 1):
             try:
-                fire_and_forget(get_random_host(), data)
-
-                # response = request_task_sync("http://127.0.0.1:8000/", data)
-                # response.raise_for_status()  # Raise an exception for HTTP error codes
-                # output = response.json()
-                # if(output[0] == "error"):
-                #     print("Error in query", requestid)
-                #     raise Exception("Error in query")
-                # logger.info(f"Client_Rec {requestid}")
-                # #print(output)
-                # print("Request",requestid,"took", response.elapsed.total_seconds(), "seconds")
-                # answers.append(output)
+                if test == "FF":
+                    fire_and_forget(get_random_host(), data)
+                if test == "SYNC":
+                    response = request_task_sync("http://127.0.0.1:8000/", data)
+                    response.raise_for_status()  # Raise an exception for HTTP error codes
+                    output = response.json()
+                    if(output[0] == "error"):
+                        print("Error in query", requestid)
+                        raise Exception("Error in query")
+                    logger.info(f"Client_Rec {requestid}")
+                    print(output)
+                    print("Request",requestid,"took", response.elapsed.total_seconds(), "seconds")
+                    answers.append(output)
                 break  # Exit the retry loop if the request was successful
             except (requests.RequestException, json.JSONDecodeError, Exception) as e:
                 print(f"Attempt {attempt} failed for query {requestid}: {e}")

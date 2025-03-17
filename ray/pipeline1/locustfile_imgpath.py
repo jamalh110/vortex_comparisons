@@ -7,21 +7,11 @@ from PIL import Image
 import requests
 from datasets import load_dataset
 from locust import HttpUser, task, between, events, constant
-from easydict import EasyDict
-import torch
-from flmr import (
-    FLMRConfig,
-    FLMRQueryEncoderTokenizer,
-)
-from torch.utils.data import DataLoader
-from transformers import AutoImageProcessor
-import pickle
-import string
-from tqdm import tqdm
-# Global configuration and helper functions
 
-SELECT_DS = range(1000)  
+# Global configuration and helper functions
 DATA_DIR = "/mydata"
+SELECT_DS = range(164000, 167000)  
+
 hosts = [
         "http://10.10.1.13:8000",
         "http://10.10.1.12:8000",
@@ -46,74 +36,12 @@ def process_image(example):
     example["imagebytes"] = image.tobytes()
     return example
 
-def prepare_inputs(sample, config):
-    sample = EasyDict(sample)
-
-    module = EasyDict(
-        {"type": "QuestionInput", "option": "default", "separation_tokens": {"start": "", "end": ""}}
-    )
-
-    instruction = sample.instruction.strip()
-    if instruction[-1] != ":":
-        instruction = instruction + ":"
-    instruction = instruction.replace(":", config.mask_instruction_token)
-    #random_instruction = random.choice(instructions)
-    text_sequence = " ".join(
-        [instruction]
-        + [module.separation_tokens.start]
-        + [sample.question]
-        + [module.separation_tokens.end]
-    )
-
-    sample["text_sequence"] = text_sequence
-
-    return sample
-
-def tokenize_inputs(examples, query_tokenizer, image_processor):
-    encoding = query_tokenizer(examples["text_sequence"])
-    examples["input_ids"] = encoding["input_ids"]
-    examples["attention_mask"] = encoding["attention_mask"]
-
-    pixel_values = []
-    for img_path in examples["img_path"]:
-
-        if img_path is None:
-            image = Image.new("RGB", (336, 336), color='black')
-        else:
-            image = Image.open(img_path).convert("RGB")
-        
-        encoded = image_processor(image, return_tensors="pt")
-        pixel_values.append(encoded.pixel_values)
-
-    pixel_values = torch.stack(pixel_values, dim=0)
-    examples["pixel_values"] = pixel_values
-    return examples
-
-def convert_to_numpy(example):
-    #print(example['pixel_values'])
-    #example["input_ids"] = example["input_ids"].numpy().tolist()
-    #example["attention_mask"] = example["attention_mask"].numpy().tolist()
-    #example["pixel_values"] = example["pixel_values"].numpy().tolist()
-    return example
-
-def generate_bytes(example):
-    data_bytes = pickle.dumps(example, protocol=pickle.HIGHEST_PROTOCOL)
-    example["data_bytes"] = data_bytes
-    return example
-
 # Dataset directories and loading
 image_root_dir = f"{DATA_DIR}/EVQA"
 use_split = "train"
 ds_dir = f"{DATA_DIR}/EVQA/EVQA_data/EVQA_data"
 p_ds_dir = f"{DATA_DIR}/EVQA/EVQA_passages/EVQA_passages"
 
-image_processor_name = '/mydata/clip-vit-large-patch14'
-checkpoint_path = '/mydata/PreFLMR_ViT-L'
-flmr_config = FLMRConfig.from_pretrained(checkpoint_path)
-query_tokenizer = FLMRQueryEncoderTokenizer.from_pretrained(checkpoint_path,
-                                                                text_config=flmr_config.text_config,
-                                                                subfolder="query_tokenizer")
-image_processor = AutoImageProcessor.from_pretrained(image_processor_name)
 # Load the primary dataset for queries
 ds = load_dataset(
     "parquet",
@@ -123,20 +51,8 @@ ds = load_dataset(
     },
 )[use_split].select(SELECT_DS)
 ds = ds.map(add_path_prefix_in_img_path, fn_kwargs={"prefix": image_root_dir})
-ds = ds.map(prepare_inputs, fn_kwargs={"config": flmr_config})
-print("tokenizing inputs")
-ds = ds.map(
-    tokenize_inputs,
-    fn_kwargs={"query_tokenizer": query_tokenizer, "image_processor": image_processor},
-    batched=True,
-    batch_size=16,
-    num_proc=1,
-)
-print("generating bytes")
-#ds = ds.map(generate_bytes)
-
 print("Dataset length:", len(ds))
-#print("First example:", ds[0])
+print("First example:", ds[0])
 # Uncomment the next line if you want to process images into bytes:
 # ds = ds.map(process_image)
 
@@ -154,30 +70,6 @@ total_queries = 0
 correct_queries = 0
 counter_lock = threading.Lock()
 
-# bytes_to_send = []
-# for i in tqdm(range(len(ds)), desc="Preparing bytes to send"):
-#     data = ds[i]
-#     requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
-#     data['requestid'] = requestid
-#     #data_bytes = data['data_bytes']
-#     data_bytes = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
-#     bytes_to_send.append((data_bytes, requestid))
-    
-bytes_to_send = []
-file_path = "/mydata/ds_test.pkl"
-if not os.path.exists(file_path):
-    for i in tqdm(SELECT_DS, desc="Preparing bytes to send"):
-        data = ds[i]
-        requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
-        data['requestid'] = requestid
-        data_bytes = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
-        bytes_to_send.append((data_bytes, requestid))
-    
-    with open(file_path, "wb") as file:
-        pickle.dump(bytes_to_send, file)
-else:
-    with open(file_path, "rb") as file:
-        bytes_to_send = pickle.load(file)
 
 def check_answer(data, answer):
     """
@@ -218,14 +110,12 @@ class EVQAUser(HttpUser):
         global total_queries, correct_queries
 
         # Choose a random example from the dataset
-        idx = random.randint(0, len(bytes_to_send) - 1)
-        data = bytes_to_send[idx][0]
-        #print(data['pixel_values'])
-        #data = convert_to_numpy(data)
+        idx = random.randint(0, len(ds) - 1)
+        data = ds[idx]
         max_retries = 3
-        headers = {'Content-Type': 'application/octet-stream'}
+
         for attempt in range(1, max_retries + 1):
-            with self.client.post(f"{get_random_host()}/", data=data, headers=headers, catch_response=True) as response:
+            with self.client.post(f"{get_random_host()}/", json=data, catch_response=True) as response:
                 try:
                     response.raise_for_status()  # Raises exception for 4xx/5xx responses
                     output = response.json()
@@ -235,13 +125,13 @@ class EVQAUser(HttpUser):
                     response.success()
                     # Check the answer and update global counters
                     if False:
-                        is_correct = check_answer(ds[idx], output)
+                        is_correct = check_answer(data, output)
                         with counter_lock:
                             total_queries += 1
                             if is_correct:
                                 correct_queries += 1
                         # Optionally print per-query result
-                        #print(f"Query idx {idx} processed. Correct: {is_correct}. Response time: {response.elapsed.total_seconds()} s")
+                        print(f"Query idx {idx} processed. Correct: {is_correct}. Response time: {response.elapsed.total_seconds()} s")
                     break  # Exit retry loop on success
                 except Exception as e:
                     response.failure(f"Attempt {attempt} failed: {e}")
