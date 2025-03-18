@@ -71,4 +71,5 @@ HF_DATASETS_CACHE=/mydata/datasets_cache locust -f locustfile.py --users 1 --spa
 Try this to fix random hanging process issue:
 RAY_kill_child_processes_on_worker_exit_with_raylet_subreaper=true
 
-
+to make object direct send bigger:
+ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.13 --resources='{"deploy_abcd": 1}' --system-config='{"max_direct_call_object_size": 67108864}'

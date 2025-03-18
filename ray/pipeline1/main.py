@@ -125,9 +125,12 @@ class StepA:
             input_text_sequence.append(input["text_sequence"])
         #self.logger.info(f"StepA_Prepare_End {inputs[0]['requestid']}")
         # query sentences: bsize of sentences
-        encoded_inputs      = self.query_tokenizer(input_text_sequence)
-        input_ids           = encoded_inputs['input_ids'].to(self.query_text_encoder.device)
-        attention_mask      = encoded_inputs['attention_mask'].to(self.query_text_encoder.device)
+        # encoded_inputs      = self.query_tokenizer(input_text_sequence)
+        # input_ids           = encoded_inputs['input_ids'].to(self.query_text_encoder.device)
+        # attention_mask      = encoded_inputs['attention_mask'].to(self.query_text_encoder.device)
+
+        input_ids = torch.stack([torch.from_numpy(i["input_ids"]) for i in inputs], dim=0).to(self.device)
+        attention_mask = torch.stack([torch.from_numpy(i["attention_mask"]) for i in inputs], dim=0).to(self.device)
         
         text_encoder_outputs = self.query_text_encoder(input_ids=input_ids,attention_mask=attention_mask)
         text_encoder_hidden_states = text_encoder_outputs[0]
@@ -332,19 +335,18 @@ class Ingress:
 
     async def __call__(self, http_request: Request):
         try:
-            requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-
+            #requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+            requestid = http_request.headers["x-requestid"]
+            logfunc(self.logger, [{"requestid": requestid}], "Ingress_Enter")
             #input = await http_request.json()
             input = await http_request.body()
             input = pickle.loads(input)
-            
-            requestid = input.get('requestid', requestid)
             input['requestid'] = requestid
-            logfunc(self.logger, [{"requestid": requestid}], "Ingress_Enter")
-            image = {"pixel_values": np.array(input['pixel_values'])}
+            
+            image = {"pixel_values": input['pixel_values']}
             image['requestid'] = requestid
 
-            stepA_output = self.stepA.remote({"requestid": requestid, "text_sequence": input['text_sequence']})
+            stepA_output = self.stepA.remote({"requestid": requestid, "text_sequence": input['text_sequence'], "input_ids": input['input_ids'], "attention_mask": input['attention_mask']})
             stepB_output = self.stepB.remote(image)    
             output_b_raw = await stepB_output
             #output_b_raw['requestid'] = requestid
@@ -363,7 +365,7 @@ class Ingress:
             })
 
             output_d_raw = await stepD_output
-            stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['question'], "query_embeddings": output_d_raw, "requestid": requestid})
+            stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['text_sequence'], "query_embeddings": output_d_raw, "requestid": requestid})
             output = await stepE_output
             logfunc(self.logger, [{"requestid": requestid}], "Ingress_Exit")
             return output

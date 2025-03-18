@@ -290,8 +290,8 @@ if __name__ == "__main__":
             bytes_to_send = pickle.load(file)
         
     totaltimestart = time.time()
-    rate = 1/16
-    seconds = 20
+    rate = 1/120
+    seconds = 100
     est_queries = int(seconds/rate * 1.2)
 
     bytes_to_send_extended = []
