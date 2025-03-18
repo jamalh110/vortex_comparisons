@@ -16,6 +16,10 @@ pip install -r requirements.txt
 on the head node:
 ray metrics launch-prometheus
 run grafana: https://docs.ray.io/en/latest/cluster/metrics.html#simplest-setting-up-grafana-with-ray-provided-configurations
+wget https://dl.grafana.com/enterprise/release/grafana-enterprise-11.5.2.linux-amd64.tar.gz
+tar -zxvf grafana-enterprise-11.5.2.linux-amd64.tar.gz
+./grafana-v11.5.2/bin/grafana-server --config /tmp/ray/session_latest/metrics/grafana/grafana.ini web
+
 sudo /users/jamalh11/.local/bin/ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.4
 
 

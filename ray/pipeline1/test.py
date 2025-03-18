@@ -32,7 +32,9 @@ hosts = [
         "http://10.10.1.13:8000",
         "http://10.10.1.12:8000",
         "http://10.10.1.11:8000",
-        "http://10.10.1.10:8000"
+        "http://10.10.1.10:8000",
+        "http://10.10.1.9:8000",
+        "http://10.10.1.8:8000"
     ]
 session = None
 
@@ -290,7 +292,7 @@ if __name__ == "__main__":
             bytes_to_send = pickle.load(file)
         
     totaltimestart = time.time()
-    rate = 1/120
+    rate = 1/270
     seconds = 100
     est_queries = int(seconds/rate * 1.2)
 

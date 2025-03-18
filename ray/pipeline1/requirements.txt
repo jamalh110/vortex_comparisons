@@ -1,3 +1,6 @@
 transformers
 pillow
 easydict
+
+
+pip install transformers pillow easydict
