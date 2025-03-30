@@ -47,8 +47,8 @@ rm lock
 
 
 For first 3 nodes:
-ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.13 --resources='{"deploy_abcd": 1}'
-ray start --address 10.10.1.13:6379 --node-ip-address 10.10.1.1 --resources='{"deploy_abcd": 1}'
+ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.10 --resources='{"deploy_abcd": 1}'
+ray start --address 10.10.1.10:6379 --node-ip-address 10.10.1.1 --resources='{"deploy_abcd": 1}'
 
 MIG partitions for 4th node:
 sudo nvidia-smi -i 0 -mig 1

@@ -31,7 +31,7 @@ applications:
   route_prefix: /
 
   #import_path: monolith_imgpath:app
-  import_path: monolith:app
+  import_path: monolith_json:app
 
   args:
     experiment_name: EVQA_train_split/

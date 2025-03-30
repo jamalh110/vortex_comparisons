@@ -105,8 +105,12 @@ def generate_bytes(example):
 # Dataset directories and loading
 image_root_dir = f"{DATA_DIR}/EVQA"
 use_split = "train"
-ds_dir = f"{DATA_DIR}/EVQA/EVQA_data/EVQA_data"
-p_ds_dir = f"{DATA_DIR}/EVQA/EVQA_passages/EVQA_passages"
+# ds_dir = f"{DATA_DIR}/EVQA/EVQA_data/EVQA_data"
+# p_ds_dir = f"{DATA_DIR}/EVQA/EVQA_passages/EVQA_passages"
+
+ds_dir = f"{DATA_DIR}/EVQA/EVQA_data"
+p_ds_dir = f"{DATA_DIR}/EVQA/EVQA_passages"
+
 
 image_processor_name = '/mydata/clip-vit-large-patch14'
 checkpoint_path = '/mydata/PreFLMR_ViT-L'
@@ -228,15 +232,15 @@ class EVQAUser(HttpUser):
         global total_queries, correct_queries
 
         # Choose a random example from the dataset
-        idx = random.randint(0, len(bytes_to_send) - 1)
-        data = bytes_to_send[idx][0]
+        idx = random.randint(0, len(ds) - 1)
+        data = ds[idx]
         #print(data['pixel_values'])
         #data = convert_to_numpy(data)
         max_retries = 3
         requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
-        headers = {'Content-Type': 'application/octet-stream', "x-requestid": requestid}
+        headers = {'Content-Type': 'application/json', "x-requestid": requestid}
         for attempt in range(1, max_retries + 1):
-            with self.client.post(f"{get_random_host()}/", data=data, headers=headers, catch_response=True) as response:
+            with self.client.post(f"{get_random_host()}/", json=data, headers=headers, catch_response=True) as response:
                 try:
                     response.raise_for_status()  # Raises exception for 4xx/5xx responses
                     output = response.json()
