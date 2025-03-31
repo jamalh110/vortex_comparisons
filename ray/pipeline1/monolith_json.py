@@ -209,7 +209,9 @@ class Monolith:
         ret = []
         for id in question_ids:
             ret.append(ranking[id])
+        #print(time.time())
         logfunc(self.logger, input_jsons, "Monolith_Exit")
+        #print(time.time())
         return ret
 
 @serve.deployment
@@ -227,12 +229,15 @@ class Ingress:
             input = await http_request.json()
             input['requestid'] = requestid
             logfunc(self.logger, [{"requestid": requestid}], "Ingress_Enter")
-            #ref = ray.put(input)
             input['pixel_values'] = np.array(input['pixel_values'])
-            ret = await self.monolith.remote(input)
-            #del ref
+
+            ref = ray.put(input)
+            ret = await self.monolith.remote(ref)
+            del ref
+            
             
             #ret = await self.monolith.remote(input)
+
             logfunc(self.logger, [{"requestid": requestid}], "Ingress_Exit")
             return ret
         

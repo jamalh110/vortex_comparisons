@@ -194,7 +194,7 @@ if __name__ == "__main__":
     ds = load_dataset('parquet', data_files ={  
                                                 'train' : ds_dir + '/train-00000-of-00001.parquet',
                                                 'test'  : ds_dir + '/test-00000-of-00001-2.parquet',
-                                                })[use_split].select(range(164000, 167000))
+                                                })[use_split].select(range(0, 5000))
 
 
 
@@ -257,7 +257,7 @@ if __name__ == "__main__":
     #exit(0)
     #print(ds['question_id'])
     #exit(0)
-    nqueries = 3000
+    nqueries = 5000
     max_retries = 3
     answers = []
     bytes_to_send = []

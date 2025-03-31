@@ -365,8 +365,8 @@ class Ingress:
                 'requestid': requestid
             })
 
-            output_d_raw = await stepD_output
-            stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['text_sequence'], "query_embeddings": output_d_raw, "requestid": requestid})
+            #output_d_raw = await stepD_output
+            stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['text_sequence'], "query_embeddings": stepD_output, "requestid": requestid})
             output = await stepE_output
             logfunc(self.logger, [{"requestid": requestid}], "Ingress_Exit")
             return output
