@@ -18,7 +18,7 @@ import io
 from PIL import Image
 from easydict import EasyDict
 from transformers.models.bert.modeling_bert import BertEncoder
-from StepD import StepD
+from StepD_directsend import StepD
 import random
 import string
 import numpy as np
