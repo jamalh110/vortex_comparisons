@@ -179,8 +179,8 @@ def getsize(obj):
 if __name__ == "__main__":
     image_root_dir = f"{DATA_DIR}/EVQA"
     use_split = "train"
-    ds_dir = f"{DATA_DIR}/EVQA/EVQA_data/EVQA_data"
-    p_ds_dir = f"{DATA_DIR}/EVQA/EVQA_passages/EVQA_passages"
+    ds_dir = f"{DATA_DIR}/EVQA/EVQA_data"
+    p_ds_dir = f"{DATA_DIR}/EVQA/EVQA_passages"
 
     logger = make_logger(os.getpid(), "Client", LOGGING_DIR)
     image_processor_name = '/mydata/clip-vit-large-patch14'
