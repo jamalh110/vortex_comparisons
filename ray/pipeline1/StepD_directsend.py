@@ -13,13 +13,18 @@ import logging
 _MAX_BATCH_SIZE = 32
 DATA_DIR="/mydata"
 LOG_DIR = "/users/jamalh11/raylogs"
-LOG_LEVEL = logging.INFO
+#LOG_LEVEL = logging.INFO
 
 @serve.deployment
 class StepD:
-    def __init__(self):
+    def __init__(self, loglevel):
         self.logger = make_logger(os.getpid(), "StepD", LOG_DIR)
-        self.logger.setLevel(LOG_LEVEL)
+        if(loglevel == "INFO"):
+            self.logger.setLevel(logging.INFO)
+        elif(loglevel == "CRITICAL"):
+            self.logger.setLevel(logging.CRITICAL)
+        else:
+            raise Exception("Invalid log level")
         self.flmr_config = None
         self.skiplist = []
         self.query_tokenizer = None
@@ -180,25 +185,26 @@ class StepD:
         return query_embeddings
     
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
-    async def __call__(self, inputs: List[Dict[str, Any]]):
-        logfunc(self.logger, inputs, "StepD_Enter")
+    async def __call__(self, stepa: List[Dict[str, Any]], stepb: List[Dict[str, Any]], requestid: List[str]):
+
+        logfunc(self.logger, [{"requestid": i} for i in requestid], "StepD_Enter")
         #print("BATCH SIZE: ",len(inputs))
         #print("stepD inputs\n\n\n", inputs[0]['input_ids'])
-        vision_second_last_layer_hidden_states = torch.stack([torch.from_numpy(x["vision_second_last_layer_hidden_states"]) for x in inputs], dim=0).cuda()
+        vision_second_last_layer_hidden_states = torch.stack([torch.from_numpy(x["vision_second_last_layer_hidden_states"]) for x in stepb], dim=0).cuda()
 
         transformer_mapping_input_features = self.transformer_mapping_input_linear(
             vision_second_last_layer_hidden_states
         )
 
-        input_ids = torch.stack([torch.from_numpy(x["input_ids"]) for x in inputs], dim=0).cuda()
-        text_embeddings = torch.stack([torch.from_numpy(x["text_embeddings"]) for x in inputs], dim=0).cuda()
-        text_encoder_hidden_states = torch.stack([torch.from_numpy(x["text_encoder_hidden_states"]) for x in inputs], dim=0).cuda()
-        vision_embeddings = torch.stack([torch.from_numpy(x["vision_embeddings"]) for x in inputs], dim=0).cuda()
+        input_ids = torch.stack([torch.from_numpy(x["input_ids"]) for x in stepa], dim=0).cuda()
+        text_embeddings = torch.stack([torch.from_numpy(x["text_embeddings"]) for x in stepa], dim=0).cuda()
+        text_encoder_hidden_states = torch.stack([torch.from_numpy(x["text_encoder_hidden_states"]) for x in stepa], dim=0).cuda()
+        vision_embeddings = torch.stack([torch.from_numpy(x["vision_embeddings"]) for x in stepb], dim=0).cuda()
 
         #transformer_mapping_input_features = torch.stack([torch.from_numpy(x["transformer_mapping_input_features"]) for x in inputs], dim=0).cuda()
         #print("stepD shape\n\n\n", text_embeddings.shape, vision_embeddings.shape, transformer_mapping_input_features.shape)
         query_embeddings = self.proces_queries(input_ids, text_embeddings, text_encoder_hidden_states, vision_embeddings, transformer_mapping_input_features).detach().cpu().numpy()
-        logfunc(self.logger, inputs, "StepD_Exit")
+        logfunc(self.logger, [{"requestid": i} for i in requestid], "StepD_Exit")
         return query_embeddings
 
 

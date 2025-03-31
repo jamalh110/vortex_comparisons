@@ -21,7 +21,7 @@ from tqdm import tqdm
 import numpy as np
 # Global configuration and helper functions
 
-SELECT_DS = range(0, 5000)  
+SELECT_DS = range(0, 6000)  
 DATA_DIR = "/mydata"
 hosts = [
         "http://10.10.1.10:8000",

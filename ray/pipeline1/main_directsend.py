@@ -37,16 +37,19 @@ _MAX_BATCH_SIZE = 32
 _STEP_E_BATCH_SIZE = 32
 DATA_DIR="/mydata"
 LOG_DIR = "/users/jamalh11/raylogs"
-LOG_LEVEL = logging.INFO
+#LOG_LEVEL = logging.INFO
 
 
 @serve.deployment
 class StepA:
-    def __init__(self):
+    def __init__(self, loglevel):
 
         
         self.logger = make_logger(os.getpid(), "StepA", LOG_DIR)
-        self.logger.setLevel(LOG_LEVEL)
+        if(loglevel == "INFO"):
+            self.logger.setLevel(logging.INFO)
+        elif(loglevel == "CRITICAL"):
+            self.logger.setLevel(logging.CRITICAL)
         self.checkpoint_path = f"{DATA_DIR}/PreFLMR_ViT-L"
         self.local_encoder_path = f'{DATA_DIR}/EVQA/models/models_step_A_query_text_encoder.pt'
         self.local_projection_path = f'{DATA_DIR}/EVQA/models/models_step_A_query_text_linear.pt'
@@ -114,7 +117,7 @@ class StepA:
         sample["text_sequence"] = text_sequence
 
         return sample
-    
+
     def stepA_output(
         self,
         inputs: List[Dict[str, Any]],
@@ -148,6 +151,7 @@ class StepA:
             "input_ids": input_ids,
             "text_encoder_hidden_states": text_encoder_hidden_states
         }
+    
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, inputs: List[Dict[str, Any]]):
         #print("BATCH SIZE: ",len(inputs))
@@ -190,9 +194,12 @@ class FLMRMultiLayerPerceptron(nn.Module):
 #TODO: batch?
 @serve.deployment
 class StepB:
-    def __init__(self):
+    def __init__(self, loglevel):
         self.logger = make_logger(os.getpid(), "StepB", LOG_DIR)
-        self.logger.setLevel(LOG_LEVEL)
+        if(loglevel == "INFO"):
+            self.logger.setLevel(logging.INFO)
+        elif(loglevel == "CRITICAL"):
+            self.logger.setLevel(logging.CRITICAL)
         self.checkpoint_path = f'{DATA_DIR}/PreFLMR_ViT-L'
         self.flmr_config = FLMRConfig.from_pretrained(self.checkpoint_path)
         self.local_encoder_path = f'{DATA_DIR}/EVQA/models/models_step_B_vision_encoder.pt'
@@ -262,9 +269,12 @@ class StepB:
 
 @serve.deployment
 class StepE:
-    def __init__(self, experiment_name: str, index_name: str):
+    def __init__(self, experiment_name: str, index_name: str, loglevel):
         self.logger = make_logger(os.getpid(), "StepE", LOG_DIR)
-        self.logger.setLevel(LOG_LEVEL)
+        if(loglevel == "INFO"):
+            self.logger.setLevel(logging.INFO)
+        elif(loglevel == "CRITICAL"):
+            self.logger.setLevel(logging.CRITICAL)
         self.searcher = None
         self.index_root_path        = f'{DATA_DIR}/EVQA/index/'
         self.index_experiment_name  = experiment_name
@@ -291,16 +301,17 @@ class StepE:
         )
         return ranking.todict()
     @serve.batch(max_batch_size=_STEP_E_BATCH_SIZE)
-    async def __call__(self, input: List[Dict[str, Any]]):
-        logfunc(self.logger, input, "StepE_Enter")
+    async def __call__(self, input1: List[Dict[str, Any]], input2: Any):
+        logfunc(self.logger, input1, "StepE_Enter")
         #bsize = len(input)
         #print("BATCH SIZE: ",len(input))
         bsize = None
         queries = {}
         query_embeddings_list = []
-        for i in input:
-            queries[i['question_id']] = i['question']
-            query_embeddings_list.append(torch.from_numpy(i['query_embeddings']))
+
+        for i, j in zip(input1, input2):
+            queries[i['question_id']] = i['text_sequence']
+            query_embeddings_list.append(torch.from_numpy(j))
 
         query_embeddings = torch.stack(query_embeddings_list, dim=0).cuda()
 
@@ -309,26 +320,29 @@ class StepE:
         #print(f"Search took {time.time() - tim} seconds")
 
         ret = []
-        for i in input:
+        for i in input1:
             ret.append(output[i['question_id']])
 
-        logfunc(self.logger, input, "StepE_Exit")
+        logfunc(self.logger, input1, "StepE_Exit")
         return ret
 
 
 @serve.deployment
 class Ingress:
-    def __init__(self, stepA: DeploymentHandle, stepB: DeploymentHandle, stepD: DeploymentHandle, stepE: DeploymentHandle):
+    def __init__(self, stepA: DeploymentHandle, stepB: DeploymentHandle, stepD: DeploymentHandle, stepE: DeploymentHandle, loglevel):
         self.logger = make_logger(os.getpid(), "Ingress", LOG_DIR)
-        self.logger.setLevel(LOG_LEVEL)
+        if(loglevel == "INFO"):
+            self.logger.setLevel(logging.INFO)
+        elif(loglevel == "CRITICAL"):
+            self.logger.setLevel(logging.CRITICAL)
         self.stepA = stepA
         self.stepB = stepB
         self.stepD = stepD
         self.stepE = stepE
-        faulthandler.enable()
+        # faulthandler.enable()
     
-        def dump_stack(signum, frame):
-            faulthandler.dump_traceback()
+        # def dump_stack(signum, frame):
+        #     faulthandler.dump_traceback()
 
         #signal.signal(signal.SIGUSR1, dump_stack)
 
@@ -339,34 +353,48 @@ class Ingress:
             requestid = http_request.headers["x-requestid"]
             logfunc(self.logger, [{"requestid": requestid}], "Ingress_Enter")
             #input = await http_request.json()
-            
+            #time1 = time.time()
             input = await http_request.body()
+            #time2 = time.time()
+            #print(f"Time to get input: {time2 - time1} seconds")
+            #time3 = time.time()
             input = pickle.loads(input)
+            #time4 = time.time()
+            #print(f"Time to unpickle input: {time4 - time3} seconds")
             input['requestid'] = requestid
             
+            
+
             image = {"pixel_values": input['pixel_values']}
+
+            del input['pixel_values']
+            inputref = ray.put(input)
+
             image['requestid'] = requestid
 
-            stepA_output = self.stepA.remote({"requestid": requestid, "text_sequence": input['text_sequence'], "input_ids": input['input_ids'], "attention_mask": input['attention_mask']})
+            #stepA_output = self.stepA.remote({"requestid": requestid, "text_sequence": input['text_sequence'], "input_ids": input['input_ids'], "attention_mask": input['attention_mask']})
+            stepA_output = self.stepA.remote(inputref)
             stepB_output = self.stepB.remote(image)    
-            output_b_raw = await stepB_output
+            #output_b_raw = await stepB_output
             #output_b_raw['requestid'] = requestid
             #stepC_output = self.stepC.remote(output_b_raw)
-            output_a_raw = await stepA_output
+            #output_a_raw = await stepA_output
             #output_c_raw = await stepC_output
             #TODO: test if passing in the objectrefs is faster than awaitng and sending
 
-            stepD_output = self.stepD.remote({
-                "input_ids": output_a_raw['input_ids'],
-                "text_embeddings": output_a_raw['text_embeddings'],
-                "text_encoder_hidden_states": output_a_raw['text_encoder_hidden_states'],
-                "vision_embeddings": output_b_raw['vision_embeddings'],
-                "vision_second_last_layer_hidden_states": output_b_raw['vision_second_last_layer_hidden_states'],
-                'requestid': requestid
-            })
-
+            # stepD_output = self.stepD.remote({
+            #     "input_ids": output_a_raw['input_ids'],
+            #     "text_embeddings": output_a_raw['text_embeddings'],
+            #     "text_encoder_hidden_states": output_a_raw['text_encoder_hidden_states'],
+            #     "vision_embeddings": output_b_raw['vision_embeddings'],
+            #     "vision_second_last_layer_hidden_states": output_b_raw['vision_second_last_layer_hidden_states'],
+            #     'requestid': requestid
+            # })
+            stepD_output = self.stepD.remote(stepA_output, stepB_output, requestid)
             #output_d_raw = await stepD_output
-            stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['text_sequence'], "query_embeddings": stepD_output, "requestid": requestid})
+            #stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['text_sequence'], "query_embeddings": stepD_output, "requestid": requestid})
+            #stepE_output = self.stepE.remote({"question_id": input['question_id'], "question": input['text_sequence'], "requestid": requestid}, stepD_output)
+            stepE_output = self.stepE.remote(inputref, stepD_output)
             output = await stepE_output
             logfunc(self.logger, [{"requestid": requestid}], "Ingress_Exit")
             return output
@@ -385,11 +413,12 @@ class Ingress:
 def app(args: Dict[str, str]) -> Application:
     experiment_name = args.get("experiment_name", "EVQA_train_split/")
     index_name = args.get("index_name", "EVQA_PreFLMR_ViT-L")
-    stepA = StepA.bind()
-    stepB = StepB.bind()
-    stepD = StepD.bind()
-    stepE = StepE.bind(experiment_name=experiment_name, index_name=index_name)
-    return Ingress.bind(stepA=stepA, stepB=stepB, stepD=stepD, stepE=stepE)
+    loglevel = args.get("loglevel", "CRITICAL")
+    stepA = StepA.bind(loglevel=loglevel)
+    stepB = StepB.bind(loglevel=loglevel)
+    stepD = StepD.bind(loglevel=loglevel)
+    stepE = StepE.bind(experiment_name=experiment_name, index_name=index_name, loglevel=loglevel)
+    return Ingress.bind(stepA=stepA, stepB=stepB, stepD=stepD, stepE=stepE, loglevel=loglevel) 
 
 # def app(args: Dict[str, str]) -> Application:
 #     stepA = StepA.bind()

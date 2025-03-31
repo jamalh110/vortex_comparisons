@@ -31,10 +31,12 @@ applications:
   route_prefix: /
 
   import_path: main_directsend:app
+  #import_path: main:app
 
   args:
     experiment_name: EVQA_train_split/
     index_name: EVQA_PreFLMR_ViT-L
+    loglevel: INFO
 
   runtime_env: {}
 

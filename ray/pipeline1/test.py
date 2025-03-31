@@ -194,7 +194,7 @@ if __name__ == "__main__":
     ds = load_dataset('parquet', data_files ={  
                                                 'train' : ds_dir + '/train-00000-of-00001.parquet',
                                                 'test'  : ds_dir + '/test-00000-of-00001-2.parquet',
-                                                })[use_split].select(range(0, 5000))
+                                                })[use_split].select(range(0, 6000))
 
 
 
@@ -257,7 +257,7 @@ if __name__ == "__main__":
     #exit(0)
     #print(ds['question_id'])
     #exit(0)
-    nqueries = 5000
+    nqueries = 6000
     max_retries = 3
     answers = []
     bytes_to_send = []
@@ -292,10 +292,11 @@ if __name__ == "__main__":
             bytes_to_send = pickle.load(file)
         
     totaltimestart = time.time()
-    rate = 1/270
+    rate = 1/int(sys.argv[1])
     seconds = 100
-    est_queries = int(seconds/rate * 1.2)
 
+    #est_queries = int(seconds/rate * 1.2)
+    est_queries = 6000
     bytes_to_send_extended = []
     for i in range(est_queries):
         requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
@@ -305,7 +306,8 @@ if __name__ == "__main__":
     bytes_to_send = bytes_to_send_extended
     test = "FF"
     #test = "SYNC"
-    for i in range(int(seconds/rate)):
+    #for i in range(int(seconds/rate)):
+    for i in range(est_queries):
         req = bytes_to_send[i]
         #print(getsize(req))
         #print(batch['text_sequence'], batch['question'])
