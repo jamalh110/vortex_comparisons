@@ -105,8 +105,8 @@ def generate_bytes(example):
 # Dataset directories and loading
 image_root_dir = f"{DATA_DIR}/EVQA"
 use_split = "train"
-ds_dir = f"{DATA_DIR}/EVQA/EVQA_data/EVQA_data"
-p_ds_dir = f"{DATA_DIR}/EVQA/EVQA_passages/EVQA_passages"
+ds_dir = f"{DATA_DIR}/EVQA/EVQA_data"
+p_ds_dir = f"{DATA_DIR}/EVQA/EVQA_passages"
 
 image_processor_name = '/mydata/clip-vit-large-patch14'
 checkpoint_path = '/mydata/PreFLMR_ViT-L'
