@@ -29,12 +29,10 @@ LOGGING_DIR = "/users/jamalh11/raylogs"
 DATA_DIR = "/mydata"
 
 hosts = [
-        "http://10.10.1.13:8000",
-        "http://10.10.1.12:8000",
-        "http://10.10.1.11:8000",
         "http://10.10.1.10:8000",
         "http://10.10.1.9:8000",
-        "http://10.10.1.8:8000"
+        "http://10.10.1.8:8000",
+        "http://10.10.1.7:8000",
     ]
 session = None
 

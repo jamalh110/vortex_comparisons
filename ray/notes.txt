@@ -54,3 +54,5 @@ serve build main:app -o serve_config.yaml
 serve deploy serve_config.yaml
 
 sudo /users/jamalh11/.local/bin/serve run serve_config.yaml
+
+sudo systemctl --now enable nvidia-dcgm
