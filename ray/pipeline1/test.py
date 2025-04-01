@@ -27,12 +27,18 @@ from gc import get_referents
 
 LOGGING_DIR = "/users/jamalh11/raylogs"
 DATA_DIR = "/mydata"
+SELECT_DS = range(0, 6000)  
+nqueries = len(SELECT_DS)
+file_path = "/mydata/ds_test.pkl"
 
 hosts = [
         "http://10.10.1.10:8000",
         "http://10.10.1.9:8000",
         "http://10.10.1.8:8000",
         "http://10.10.1.7:8000",
+        "http://10.10.1.3:8000",
+        "http://10.10.1.2:8000",
+        "http://10.10.1.1:8000",
     ]
 session = None
 
@@ -192,7 +198,7 @@ if __name__ == "__main__":
     ds = load_dataset('parquet', data_files ={  
                                                 'train' : ds_dir + '/train-00000-of-00001.parquet',
                                                 'test'  : ds_dir + '/test-00000-of-00001-2.parquet',
-                                                })[use_split].select(range(0, 6000))
+                                                })[use_split].select(SELECT_DS)
 
 
 
@@ -255,11 +261,10 @@ if __name__ == "__main__":
     #exit(0)
     #print(ds['question_id'])
     #exit(0)
-    nqueries = 6000
     max_retries = 3
     answers = []
     bytes_to_send = []
-    file_path = "/mydata/ds_test.pkl"
+    
     if not os.path.exists(file_path):
         for i in tqdm(range(nqueries), desc="Preparing bytes to send"):
             data = ds[i]
@@ -294,7 +299,7 @@ if __name__ == "__main__":
     seconds = 100
 
     #est_queries = int(seconds/rate * 1.2)
-    est_queries = 6000
+    est_queries = nqueries
     bytes_to_send_extended = []
     for i in range(est_queries):
         requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
