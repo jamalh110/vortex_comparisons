@@ -18,7 +18,7 @@ logging_config:
 
   encoding: TEXT
 
-  log_level: DEBUG
+  log_level: CRITICAL
 
   logs_dir: null
 
@@ -42,7 +42,7 @@ applications:
   deployments:
 
   - name: Monolith
-    num_replicas: 4
+    num_replicas: 7
     max_ongoing_requests: 16
     ray_actor_options:
       num_cpus: 8.0

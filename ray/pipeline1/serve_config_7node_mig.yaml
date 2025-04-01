@@ -93,6 +93,7 @@ applications:
             COLBERT_LOAD_TORCH_EXTENSION_VERBOSE: "True"
 
   - name: Ingress
+    #num_replicas: 35
     num_replicas: 28
     max_ongoing_requests: 100
     ray_actor_options:
