@@ -40,5 +40,5 @@ query = queries[4]
 url = get_random_host()
 requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
 response = request_task_sync(url, query[1].tolist(), requestid=requestid)
-print(query[0], "|",response.text)
+print(query[0], "|",response.json())
 #print(json.dumps(queries[0][1].tolist(), indent=2))
