@@ -32,48 +32,19 @@ applications:
 
   import_path: main:app
 
-  args:
-    search_type: "gpu"
-
   # runtime_env:
   #   pip: "/users/jamalh11/vortex_comparisons/ray/requirements.txt"
 
   deployments:
 
-  - name: Encoder
+  - name: StepAudio
     max_ongoing_requests: 32
     ray_actor_options:
       num_cpus: 1.0
       num_gpus: 0.02
 
-  - name: Search
-    max_ongoing_requests: 32
-    ray_actor_options:
-      num_cpus: 1.0
-      num_gpus: 0.65
-      runtime_env:
-        env_vars:
-          search_type: "gpu"
-
-  - name: DocGen
-    num_replicas: 6
-    max_ongoing_requests: 1
-    ray_actor_options:
-      num_cpus: 1.0
-      num_gpus: 0.18
-
-  - name: TTS
-    num_replicas: 12
-    max_ongoing_requests: 1
-    ray_actor_options:
-      num_cpus: 1.0
-      num_gpus: 0.07
-
-  - name: TextCheck
-    max_ongoing_requests: 32
-    ray_actor_options:
-      num_cpus: 1.0
-      num_gpus: 0.1
-
   - name: Ingress
+    num_replicas: 1
     max_ongoing_requests: 200
+    ray_actor_options:
+      num_cpus: 1.0

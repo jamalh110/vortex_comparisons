@@ -1,0 +1,13 @@
+sudo chmod -R a+rwx /mydata
+./download_data.sh
+git clone https://github.com/aliciayuting/SenseVoice.git
+cd SenseVoice
+pip install -r requirements.txt
+pip install ray[serve]
+
+ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.11
+ray metrics launch-prometheus
+wget https://dl.grafana.com/enterprise/release/grafana-enterprise-11.5.2.linux-amd64.tar.gz
+tar -zxvf grafana-enterprise-11.5.2.linux-amd64.tar.gz
+cd grafana-v11.5.2/
+./bin/grafana-server --config /tmp/ray/session_latest/metrics/grafana/grafana.ini web &
