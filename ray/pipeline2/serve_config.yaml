@@ -54,7 +54,19 @@ applications:
     ray_actor_options:
       num_cpus: 1.0
       num_gpus: 0.02
+  
+  - name: StepLangDect
+    max_ongoing_requests: 1
+    ray_actor_options:
+      num_cpus: 1.0
+      num_gpus: 0.02
 
+  - name: StepToxCheck
+    max_ongoing_requests: 1
+    ray_actor_options:
+      num_cpus: 1.0
+      num_gpus: 0.02
+    
   - name: Ingress
     num_replicas: 1
     max_ongoing_requests: 200

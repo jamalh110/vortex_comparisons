@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 import os 
 import torch
 from torch import Tensor, nn
-from transformers import AutoImageProcessor, BertConfig
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import io
 import random
 import string
@@ -34,7 +34,7 @@ from SenseVoice.model import SenseVoiceSmall
 
 
 _MAX_BATCH_SIZE = 32
-DATA_DIR="/mydata/pipeline2"
+DATA_DIR="/mydata/msmarco"
 LOG_DIR = "/users/jamalh11/raylogs"
 LOG_LEVEL = logging.INFO
 
@@ -117,22 +117,102 @@ class StepSearch:
         self.gpu_index.nprobe = 10
         self.topk = 5
 
+        self.docs = []
+        with open(os.path.join(DATA_DIR, "msmarco_3_clusters/doc_list.pkl"), "rb") as f:
+            self.docs = pickle.load(f)
+        print("Loaded documents and index")
+
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, inputs: List, requestIds: List):
         logfunc(self.logger, requestIds, "StepSearch_Enter")
         _, I = self.gpu_index.search(np.stack(inputs, axis=0), self.topk)
         #TODO: pull docs
+        ret_docs = []
+        for indexes in I:
+            ret_docs.append([self.docs[int(i)] for i in indexes])
         logfunc(self.logger, requestIds, "StepSearch_Exit")
-        return I
+        return ret_docs
+    
+@serve.deployment
+class StepLangDect:
+    def __init__(self):
+        self.logger = make_logger(os.getpid(), "StepLangDect", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
+        self.model_ckpt = "papluca/xlm-roberta-base-language-detection"
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_ckpt)
+        self.device = 'cuda:0'
+        self.model = AutoModelForSequenceClassification.from_pretrained(self.model_ckpt).to(self.device)
+
+    def model_exec(self, texts: list[str]) -> np.ndarray:
+        inputs = self.tokenizer(texts, return_tensors='pt', padding=True, truncation=True).to(self.device)
+        with torch.no_grad():
+            logits = self.model(**inputs).logits
+        preds = torch.softmax(logits, dim=-1)
+        # Map raw predictions to languages
+        id2lang = self.model.config.id2label
+        vals, idxs = torch.max(preds, dim=1)
+        # print({id2lang[k.item()]: v.item() for k, v in zip(idxs, vals)})
+        languages = []
+        for k, v in zip(idxs, vals):
+            lang = id2lang[k.item()]
+            languages.append(lang)
+        return languages
+
+    #@serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    async def __call__(self, inputs: List, requestId: Any):
+        logfunc(self.logger, [requestId], "StepLangDect_Enter")
+        result =  self.model_exec(inputs)
+        #print(result)
+        logfunc(self.logger, [requestId], "StepLangDect_Exit")
+        return result
+
+@serve.deployment
+class StepToxCheck:
+    def __init__(self):
+        self.logger = make_logger(os.getpid(), "StepToxCheck", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
+        self.model = None
+        self.tokenizer = None
+        self.device = "cuda:0"
+        self.model_name = "badmatr11x/distilroberta-base-offensive-hateful-speech-text-multiclassification"
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name).to(self.device)
+
+    def model_exec(self, batch_premise: list[str]) -> np.ndarray:
+        '''
+        batch_premise: list of text strings
+        
+        return: classified type ID
+        0 hate speech, 1 offensive language, 2 neither
+        '''
+        inputs = self.tokenizer(batch_premise, return_tensors='pt', padding=True, truncation=True).to(self.device)
+        with torch.no_grad():
+            result = self.model(**inputs)
+        logits = result.logits  # result[0] is now deprecated, use result.logits instead
+        probs = logits.softmax(dim=1)
+        full_probs = probs.detach().cpu()
+        list_of_ids = torch.argmax(full_probs, dim=1).tolist() 
+        return list_of_ids
+    
+    #@serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    async def __call__(self, inputs: List, requestId: Any):
+        logfunc(self.logger, [requestId], "StepToxCheck_Enter")
+        result = self.model_exec(inputs)
+        print(result)
+        logfunc(self.logger, [requestId], "StepToxCheck_Exit")
+        return result
+
 
 @serve.deployment
 class Ingress:
-    def __init__(self, stepAudio: DeploymentHandle, stepEncode: DeploymentHandle, stepSearch: DeploymentHandle):
+    def __init__(self, stepAudio: DeploymentHandle, stepEncode: DeploymentHandle, stepSearch: DeploymentHandle, stepLangDect: DeploymentHandle, stepToxCheck: DeploymentHandle):
         self.logger = make_logger(os.getpid(), "Ingress", LOG_DIR)
         self.logger.setLevel(LOG_LEVEL)
         self.stepAudio = stepAudio
         self.stepEncode = stepEncode
         self.stepSearch = stepSearch
+        self.stepLangDect = stepLangDect
+        self.stepToxCheck = stepToxCheck
 
     async def __call__(self, http_request: Request):
         try:
@@ -147,9 +227,10 @@ class Ingress:
             logfunc(self.logger, [rid_obj], "Ingress_Numpy_Converted")
             stepaudio_output = self.stepAudio.remote(inputArr, rid_obj)
             stepencode_output = self.stepEncode.remote(stepaudio_output, rid_obj)
-            stepsearch_output = self.stepSearch.remote(stepencode_output, rid_obj)
-            
-            return await stepsearch_output
+            stepsearch_output = await self.stepSearch.remote(stepencode_output, rid_obj)._to_object_ref()
+            steplangdect_output = self.stepLangDect.remote(stepsearch_output, rid_obj)
+            steptoxcheck_output = self.stepToxCheck.remote(stepsearch_output, rid_obj)
+            return await stepaudio_output, await stepsearch_output, await steplangdect_output, await steptoxcheck_output
         except Exception as e:
             print("\n\n\n\n ERROR:", e, "\n\n\n\n")
             traceback.print_exc()
@@ -161,4 +242,6 @@ def app(args: Dict[str, str]) -> Application:
     stepAudio = StepAudio.bind()
     stepEncode = StepEncode.bind()
     stepSearch = StepSearch.bind()
-    return Ingress.bind(stepAudio=stepAudio, stepEncode=stepEncode, stepSearch=stepSearch)
+    stepLangDect = StepLangDect.bind()
+    stepToxCheck = StepToxCheck.bind()
+    return Ingress.bind(stepAudio=stepAudio, stepEncode=stepEncode, stepSearch=stepSearch, stepLangDect=stepLangDect, stepToxCheck=stepToxCheck)

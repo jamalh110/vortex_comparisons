@@ -8,8 +8,10 @@ import random
 hosts = [
         "http://10.10.1.11:8000",
     ]
-data_dir = "/mydata/pipeline2"
-
+#data_dir = "/mydata/pipeline2"
+query_file = "queries_audio1.pkl"
+data_dir = "/mydata/msmarco"
+query_file = "queries_audio5000.pkl"
 def get_random_host():
         """Return a randomly selected host from the list."""
         return random.choice(hosts)
@@ -28,7 +30,7 @@ def request_task_sync(url, data_json, requestid):
 # Load the queries from the pickle file 
 # using the correct method
 queries = []
-with open(os.path.join(data_dir, "queries_audio1.pkl"), "rb") as f:
+with open(os.path.join(data_dir, "queries_audio5000.pkl"), "rb") as f:
     queries = pickle.load(f)
 
 print(len(queries))
@@ -36,7 +38,7 @@ print(len(queries[0][1]))
 
 
 # Send the first query to the server
-query = queries[4]
+query = queries[2]
 url = get_random_host()
 requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
 response = request_task_sync(url, query[1].tolist(), requestid=requestid)
