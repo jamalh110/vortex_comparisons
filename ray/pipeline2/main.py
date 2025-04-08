@@ -38,12 +38,8 @@ DATA_DIR="/mydata/msmarco"
 LOG_DIR = "/users/jamalh11/raylogs"
 LOG_LEVEL = logging.INFO
 
-
-@serve.deployment
-class StepAudio:
+class StepAudioModel:
     def __init__(self):
-        self.logger = make_logger(os.getpid(), "StepAudio", LOG_DIR)
-        self.logger.setLevel(LOG_LEVEL)
         self.language = 'en'
         self.model_dir = "iic/SenseVoiceSmall"
         self.model = None
@@ -78,38 +74,16 @@ class StepAudio:
             #print(type(text_list[idx]))
         return text_list
 
-    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
-    async def __call__(self, inputs: List, requestIds: List):
-        logfunc(self.logger, requestIds, "StepAudio_Enter")
-        ret = self.exec_model(inputs)
-        logfunc(self.logger, requestIds, "StepAudio_Exit")
-        return ret
-
-@serve.deployment
-class StepEncode:
+class StepEncodeModel:
     def __init__(self):
-        self.logger = make_logger(os.getpid(), "StepEncode", LOG_DIR)
-        self.logger.setLevel(LOG_LEVEL)
         self.encoder = FlagModel(
-               'BAAI/bge-small-en-v1.5',
-               'cuda:0',
-          )
+                'BAAI/bge-small-en-v1.5',
+                'cuda:0',
+            )
         self.emb_dim = 384
 
-    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
-    async def __call__(self, inputs: List, requestIds: List):
-        logfunc(self.logger, requestIds, "StepEncode_Enter")
-        #is numpy array
-        result =  self.encoder.encode(inputs)
-        logfunc(self.logger, requestIds, "StepEncode_Exit")
-        #TODO: test removing this and just returning result
-        return [result[i] for i in range(len(result))]
-
-@serve.deployment
-class StepSearch:
+class StepSearchModel:
     def __init__(self):
-        self.logger = make_logger(os.getpid(), "StepSearch", LOG_DIR)
-        self.logger.setLevel(LOG_LEVEL)
         self.index_dir = os.path.join(DATA_DIR, "msmarco_pq.index")
         self.cpu_index = faiss.read_index(self.index_dir)
         self.res = faiss.StandardGpuResources()
@@ -121,24 +95,16 @@ class StepSearch:
         with open(os.path.join(DATA_DIR, "msmarco_3_clusters/doc_list.pkl"), "rb") as f:
             self.docs = pickle.load(f)
         print("Loaded documents and index")
-
-    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
-    async def __call__(self, inputs: List, requestIds: List):
-        logfunc(self.logger, requestIds, "StepSearch_Enter")
-        _, I = self.gpu_index.search(np.stack(inputs, axis=0), self.topk)
+    def search(self, inputs):
+        _, I = self.gpu_index.search(inputs, self.topk)
         #TODO: pull docs
         ret_docs = []
         for indexes in I:
             ret_docs.append([self.docs[int(i)] for i in indexes])
-            #ret_docs.append(["hi"])
-        logfunc(self.logger, requestIds, "StepSearch_Exit")
         return ret_docs
     
-@serve.deployment
-class StepLangDect:
+class StepLangDectModel:
     def __init__(self):
-        self.logger = make_logger(os.getpid(), "StepLangDect", LOG_DIR)
-        self.logger.setLevel(LOG_LEVEL)
         self.model_ckpt = "papluca/xlm-roberta-base-language-detection"
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_ckpt)
         self.device = 'cuda:0'
@@ -158,20 +124,9 @@ class StepLangDect:
             lang = id2lang[k.item()]
             languages.append(lang)
         return languages
-
-    #@serve.batch(max_batch_size=_MAX_BATCH_SIZE)
-    async def __call__(self, inputs: Any, requestId: Any):
-        logfunc(self.logger, [requestId], "StepLangDect_Enter")
-        result =  self.model_exec(inputs)
-        #print(result)
-        logfunc(self.logger, [requestId], "StepLangDect_Exit")
-        return result
-
-@serve.deployment
-class StepToxCheck:
+    
+class StepToxCheckModel:
     def __init__(self):
-        self.logger = make_logger(os.getpid(), "StepToxCheck", LOG_DIR)
-        self.logger.setLevel(LOG_LEVEL)
         self.model = None
         self.tokenizer = None
         self.device = "cuda:0"
@@ -194,15 +149,105 @@ class StepToxCheck:
         full_probs = probs.detach().cpu()
         list_of_ids = torch.argmax(full_probs, dim=1).tolist() 
         return list_of_ids
+
+@serve.deployment
+class Monolith:
+    def __init__(self):
+        self.logger = make_logger(os.getpid(), "Monolith", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
+        self.stepAudioModel = StepAudioModel()
+        self.stepEncodeModel = StepEncodeModel()
+        self.stepSearchModel = StepSearchModel()
+        self.stepLangDectModel = StepLangDectModel()
+        self.stepToxCheckModel = StepToxCheckModel()
+
+
+    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    async def __call__(self, inputs: List, requestIds: List):
+        logfunc(self.logger, requestIds, "Monolith_Enter")
+        res = []
+        stepAudioOutput = self.stepAudioModel.exec_model(inputs)
+        stepEncodeOutput = self.stepEncodeModel.encoder.encode(stepAudioOutput)
+        stepSearchOutput = self.stepSearchModel.search(stepEncodeOutput)
+        #TODO: see if batching works here
+        for i in range(len(stepSearchOutput)):
+            stepLangDectOutput = self.stepLangDectModel.model_exec(stepSearchOutput[i])
+            stepToxCheckOutput = self.stepToxCheckModel.model_exec(stepSearchOutput[i])
+            res.append((stepAudioOutput[i], stepSearchOutput[i], stepLangDectOutput, stepToxCheckOutput))
+        logfunc(self.logger, requestIds, "Monolith_Exit")
+        return res
+
+@serve.deployment
+class StepAudio:
+    def __init__(self):
+        self.logger = make_logger(os.getpid(), "StepAudio", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
+        self.model = StepAudioModel()
+        
+    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    async def __call__(self, inputs: List, requestIds: List):
+        logfunc(self.logger, requestIds, "StepAudio_Enter")
+        #TODO: check if need to numpy stack?
+        ret = self.model.exec_model(inputs)
+        logfunc(self.logger, requestIds, "StepAudio_Exit")
+        return ret
+
+@serve.deployment
+class StepEncode:
+    def __init__(self):
+        self.logger = make_logger(os.getpid(), "StepEncode", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
+        self.model = StepEncodeModel()
+
+    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    async def __call__(self, inputs: List, requestIds: List):
+        logfunc(self.logger, requestIds, "StepEncode_Enter")
+        #result is numpy array
+        result =  self.model.encoder.encode(inputs)
+        logfunc(self.logger, requestIds, "StepEncode_Exit")
+        #TODO: test removing this and just returning result
+        return [result[i] for i in range(len(result))]
+
+@serve.deployment
+class StepSearch:
+    def __init__(self):
+        self.logger = make_logger(os.getpid(), "StepSearch", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
+        self.model = StepSearchModel()
+    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    async def __call__(self, inputs: List, requestIds: List):
+        logfunc(self.logger, requestIds, "StepSearch_Enter")
+        res = self.model.search(np.stack(inputs, axis=0))
+        logfunc(self.logger, requestIds, "StepSearch_Exit")
+        return res
+    
+@serve.deployment
+class StepLangDect:
+    def __init__(self):
+        self.logger = make_logger(os.getpid(), "StepLangDect", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
+        self.model = StepLangDectModel()
+
+    #@serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    async def __call__(self, inputs: Any, requestId: Any):
+        logfunc(self.logger, [requestId], "StepLangDect_Enter")
+        result =  self.model.model_exec(inputs)
+        logfunc(self.logger, [requestId], "StepLangDect_Exit")
+        return result
+
+@serve.deployment
+class StepToxCheck:
+    def __init__(self):
+        self.logger = make_logger(os.getpid(), "StepToxCheck", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
+        self.model = StepToxCheckModel()
     
     #@serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, inputs: Any, requestId: Any):
         logfunc(self.logger, [requestId], "StepToxCheck_Enter")
-        result = self.model_exec(inputs)
-        print(result)
+        result = self.model.model_exec(inputs)
         logfunc(self.logger, [requestId], "StepToxCheck_Exit")
         return result
-
 
 @serve.deployment
 class Ingress:
@@ -242,6 +287,31 @@ class Ingress:
             traceback.print_exc()
             return ["error"]
 
+@serve.deployment
+class Ingress_Mono:
+    def __init__(self, monolith: DeploymentHandle):
+        self.logger = make_logger(os.getpid(), "Ingress_Mono", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
+        self.monolith = monolith
+
+    async def __call__(self, http_request: Request):
+        try:
+            requestid = http_request.headers["x-requestid"]
+            rid_obj = {"requestid": requestid}
+            logfunc(self.logger, [rid_obj], "Ingress_Mono_Enter")
+            input = await http_request.json()
+            logfunc(self.logger, [rid_obj], "Ingress_Mono_Input_Decoded")
+            inputArr = np.array(input)  
+            logfunc(self.logger, [rid_obj], "Ingress_Mono_Numpy_Converted")
+            mono_output = self.monolith.remote(inputArr, rid_obj)
+            res = await mono_output
+            logfunc(self.logger, [rid_obj], "Ingress_Mono_Exit")
+            return res
+        except Exception as e:
+            print("\n\n\n\n ERROR:", e, "\n\n\n\n")
+            traceback.print_exc()
+            return ["error"]
+
 
 
 def app(args: Dict[str, str]) -> Application:
@@ -251,3 +321,7 @@ def app(args: Dict[str, str]) -> Application:
     stepLangDect = StepLangDect.bind()
     stepToxCheck = StepToxCheck.bind()
     return Ingress.bind(stepAudio=stepAudio, stepEncode=stepEncode, stepSearch=stepSearch, stepLangDect=stepLangDect, stepToxCheck=stepToxCheck)
+
+def app_mono(args: Dict[str, str]) -> Application:
+    monolith = Monolith.bind()
+    return Ingress_Mono.bind(monolith=monolith)
