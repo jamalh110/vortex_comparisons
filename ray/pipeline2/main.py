@@ -174,6 +174,27 @@ class Monolith:
             stepLangDectOutput = self.stepLangDectModel.model_exec(stepSearchOutput[i])
             stepToxCheckOutput = self.stepToxCheckModel.model_exec(stepSearchOutput[i])
             res.append((stepAudioOutput[i], stepSearchOutput[i], stepLangDectOutput, stepToxCheckOutput))
+
+
+        # this resulted in worse performance
+        # flattened_search_output = [item for sublist in stepSearchOutput for item in sublist]
+        # stepLangDectOutput = self.stepLangDectModel.model_exec(flattened_search_output)
+        # stepToxCheckOutput = self.stepToxCheckModel.model_exec(flattened_search_output)
+        # # Reassemble outputs into the structure of stepSearchOutput
+        # lang_nested_output = []
+        # tox_nested_output = []
+        # index = 0
+        # for sublist in stepSearchOutput:
+        #     n = len(sublist)
+        #     lang_nested_output.append(stepLangDectOutput[index:index+n])
+        #     tox_nested_output.append(stepToxCheckOutput[index:index+n])
+        #     index += n
+
+        # for i in range(len(stepSearchOutput)):
+        #     res.append((stepAudioOutput[i], stepSearchOutput[i], lang_nested_output[i], tox_nested_output[i]))
+
+
+
         logfunc(self.logger, requestIds, "Monolith_Exit")
         return res
 

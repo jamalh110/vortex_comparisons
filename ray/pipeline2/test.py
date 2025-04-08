@@ -32,13 +32,16 @@ def request_task_sync(url, data_json, requestid):
 queries = []
 with open(os.path.join(data_dir, "queries_audio5000.pkl"), "rb") as f:
     queries = pickle.load(f)
+queries_filtered = []
+for i in range(len(queries)):
+    if len(queries[i][1]) <= 200000:
+        queries_filtered.append(queries[i])
 
+queries = queries_filtered
 print(len(queries))
 print(len(queries[0][1]))
-
-
 # Send the first query to the server
-for i in range(2):
+for i in range(len(queries)):
     query = queries[i]
     url = get_random_host()
     requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))

@@ -11,3 +11,6 @@ wget https://dl.grafana.com/enterprise/release/grafana-enterprise-11.5.2.linux-a
 tar -zxvf grafana-enterprise-11.5.2.linux-amd64.tar.gz
 cd grafana-v11.5.2/
 ./bin/grafana-server --config /tmp/ray/session_latest/metrics/grafana/grafana.ini web &
+
+
+locust -f locustfile.py --users 1 --spawn-rate 2 --headless -H http://10.10.1.4:8000
