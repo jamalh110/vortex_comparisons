@@ -130,6 +130,7 @@ class StepSearch:
         ret_docs = []
         for indexes in I:
             ret_docs.append([self.docs[int(i)] for i in indexes])
+            #ret_docs.append(["hi"])
         logfunc(self.logger, requestIds, "StepSearch_Exit")
         return ret_docs
     
@@ -159,7 +160,7 @@ class StepLangDect:
         return languages
 
     #@serve.batch(max_batch_size=_MAX_BATCH_SIZE)
-    async def __call__(self, inputs: List, requestId: Any):
+    async def __call__(self, inputs: Any, requestId: Any):
         logfunc(self.logger, [requestId], "StepLangDect_Enter")
         result =  self.model_exec(inputs)
         #print(result)
@@ -195,7 +196,7 @@ class StepToxCheck:
         return list_of_ids
     
     #@serve.batch(max_batch_size=_MAX_BATCH_SIZE)
-    async def __call__(self, inputs: List, requestId: Any):
+    async def __call__(self, inputs: Any, requestId: Any):
         logfunc(self.logger, [requestId], "StepToxCheck_Enter")
         result = self.model_exec(inputs)
         print(result)
@@ -227,10 +228,15 @@ class Ingress:
             logfunc(self.logger, [rid_obj], "Ingress_Numpy_Converted")
             stepaudio_output = self.stepAudio.remote(inputArr, rid_obj)
             stepencode_output = self.stepEncode.remote(stepaudio_output, rid_obj)
+            #for some reason, the next steps hang without waiting for object ref here. 
+            #TODO: figure out why. Test on a simplfied pipeline and see if sending a deploymentresponse to two steps in a row causes issues
             stepsearch_output = await self.stepSearch.remote(stepencode_output, rid_obj)._to_object_ref()
+            #stepsearch_output = self.stepSearch.remote(stepencode_output, rid_obj)
             steplangdect_output = self.stepLangDect.remote(stepsearch_output, rid_obj)
             steptoxcheck_output = self.stepToxCheck.remote(stepsearch_output, rid_obj)
-            return await stepaudio_output, await stepsearch_output, await steplangdect_output, await steptoxcheck_output
+            res = await stepaudio_output, await stepsearch_output, await steplangdect_output, await steptoxcheck_output
+            logfunc(self.logger, [rid_obj], "Ingress_Exit")
+            return res
         except Exception as e:
             print("\n\n\n\n ERROR:", e, "\n\n\n\n")
             traceback.print_exc()
