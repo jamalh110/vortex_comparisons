@@ -34,6 +34,7 @@ with open(os.path.join(data_dir, "queries_audio5000.pkl"), "rb") as f:
 queries_filtered = []
 for i in range(len(queries)):
     if len(queries[i][1]) <= 200000:
+    #if len(queries[i][1]) <= 200000000:
         queries_filtered.append(queries[i])
 
 queries = queries_filtered

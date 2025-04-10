@@ -3,6 +3,11 @@ sudo chmod -R a+rwx /mydata
 git clone https://github.com/aliciayuting/SenseVoice.git
 cd SenseVoice
 pip install -r requirements.txt
+
+
+
+
+
 pip install ray[serve]
 
 ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.11
@@ -12,5 +17,12 @@ tar -zxvf grafana-enterprise-11.5.2.linux-amd64.tar.gz
 cd grafana-v11.5.2/
 ./bin/grafana-server --config /tmp/ray/session_latest/metrics/grafana/grafana.ini web &
 
+sudo nvidia-smi -i 0 -mig 1
+sudo reboot
+sudo nvidia-smi mig -i 0 -cgi 1g.6gb -C
+sudo nvidia-smi mig -i 0 -cgi 2g.12gb -C
+use nvidia-smi -L to get UUIDs
 
-locust -f locustfile.py --users 1 --spawn-rate 2 --headless -H http://10.10.1.4:8000
+CUDA_VISIBLE_DEVICES=MIG-ebbec483-4031-5f3b-b4a6-3cdd3214d67f,MIG-5ff86a32-9c39-51a3-a489-a24a7a817a77 ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.11 --num-gpus=2
+
+locust -f locustfile.py --users 50 --spawn-rate 50 --headless -H http://10.10.1.4:8000 --processes 4

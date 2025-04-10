@@ -21,9 +21,9 @@ else
 fi
 
 # Python interface is currently not needed for vortex, but it is needed to buildthe GIST dataset with clusters. So need to install it on the server that handle the data processing
-read -p "Install FAISS Python interface? (y/n): " response
-response=${response,,}
-
+# read -p "Install FAISS Python interface? (y/n): " response
+# response=${response,,}
+response="y"
 if [[ "$response" == "y" ]]; then
     enable_python="ON"
 elif [[ "$response" == "n" ]]; then

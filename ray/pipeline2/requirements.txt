@@ -1,1 +1,2 @@
 funasr
+nemo_toolkit[‘all’]

@@ -21,6 +21,9 @@ import signal
 import pickle
 import logging
 from myutils import make_logger, logfunc
+from nemo.collections.tts.models import FastPitchModel, HifiGanModel
+from torch.nn.utils.rnn import pad_sequence
+from transformers import BartTokenizer, BartForSequenceClassification
 
 from funasr.utils.postprocess_utils import rich_transcription_postprocess
 from funasr.utils.load_utils import extract_fbank
@@ -33,6 +36,7 @@ from SenseVoice.utils.frontend import WavFrontend, WavFrontendOnline
 from SenseVoice.model import SenseVoiceSmall
 
 
+#TODO: make the TTS shapes between smart monoloth and monolith and micro the same (not actually important, but it's bothering me)
 _MAX_BATCH_SIZE = 32
 DATA_DIR="/mydata/msmarco"
 LOG_DIR = "/users/jamalh11/raylogs"
@@ -89,50 +93,50 @@ class StepSearchModel:
         self.res = faiss.StandardGpuResources()
         self.gpu_index = faiss.index_cpu_to_gpu(self.res, 0, self.cpu_index)
         self.gpu_index.nprobe = 10
-        self.topk = 5
-
+        self.topk = 1
         self.docs = []
         with open(os.path.join(DATA_DIR, "msmarco_3_clusters/doc_list.pkl"), "rb") as f:
             self.docs = pickle.load(f)
+        
+        self.encodeModel = StepEncodeModel()
         print("Loaded documents and index")
     def search(self, inputs):
-        _, I = self.gpu_index.search(inputs, self.topk)
+        encoded_inputs = self.encodeModel.encoder.encode(inputs)
+        _, I = self.gpu_index.search(encoded_inputs, self.topk)
         #TODO: pull docs
         ret_docs = []
         for indexes in I:
             ret_docs.append([self.docs[int(i)] for i in indexes])
         return ret_docs
     
-class StepLangDectModel:
+class StepTTSModel:
     def __init__(self):
-        self.model_ckpt = "papluca/xlm-roberta-base-language-detection"
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_ckpt)
-        self.device = 'cuda:0'
-        self.model = AutoModelForSequenceClassification.from_pretrained(self.model_ckpt).to(self.device)
+        self.fastpitchname = "nvidia/tts_en_fastpitch"
+        self.hifiganname = "nvidia/tts_hifigan"
+        self.device = torch.device("cuda")
+        self.fastpitch = FastPitchModel.from_pretrained(self.fastpitchname).to(self.device).eval()
+        self.hifigan = HifiGanModel.from_pretrained(model_name=self.hifiganname).to(self.device).eval()
+
 
     def model_exec(self, texts: list[str]) -> np.ndarray:
-        inputs = self.tokenizer(texts, return_tensors='pt', padding=True, truncation=True).to(self.device)
         with torch.no_grad():
-            logits = self.model(**inputs).logits
-        preds = torch.softmax(logits, dim=-1)
-        # Map raw predictions to languages
-        id2lang = self.model.config.id2label
-        vals, idxs = torch.max(preds, dim=1)
-        # print({id2lang[k.item()]: v.item() for k, v in zip(idxs, vals)})
-        languages = []
-        for k, v in zip(idxs, vals):
-            lang = id2lang[k.item()]
-            languages.append(lang)
-        return languages
+            token_list = [self.fastpitch.parse(text).squeeze(0) for text in texts]
+            tokens = pad_sequence(token_list, batch_first=True).to(self.device)
+            spectrograms = self.fastpitch.generate_spectrogram(tokens=tokens)
+            audios = self.hifigan.convert_spectrogram_to_audio(spec=spectrograms)
+
+        np_audios = audios.cpu().numpy()
+        return np_audios
     
 class StepToxCheckModel:
     def __init__(self):
         self.model = None
         self.tokenizer = None
         self.device = "cuda:0"
-        self.model_name = "badmatr11x/distilroberta-base-offensive-hateful-speech-text-multiclassification"
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name).to(self.device)
+        self.model_name = "facebook/bart-large-mnli"
+        self.hypothesis = "harmful."
+        self.tokenizer = BartTokenizer.from_pretrained(self.model_name)
+        self.model = BartForSequenceClassification.from_pretrained(self.model_name).to(self.device)
 
     def model_exec(self, batch_premise: list[str]) -> np.ndarray:
         '''
@@ -141,14 +145,16 @@ class StepToxCheckModel:
         return: classified type ID
         0 hate speech, 1 offensive language, 2 neither
         '''
-        inputs = self.tokenizer(batch_premise, return_tensors='pt', padding=True, truncation=True).to(self.device)
+        inputs = self.tokenizer(batch_premise,
+                       [self.hypothesis] * len(batch_premise),
+                       return_tensors='pt', padding=True, truncation=True).to(self.device)
         with torch.no_grad():
             result = self.model(**inputs)
-        logits = result.logits  # result[0] is now deprecated, use result.logits instead
-        probs = logits.softmax(dim=1)
-        full_probs = probs.detach().cpu()
-        list_of_ids = torch.argmax(full_probs, dim=1).tolist() 
-        return list_of_ids
+        logits = result.logits
+        entail_contradiction_logits = logits[:, [0, 2]]  # entailment = index 2
+        probs = entail_contradiction_logits.softmax(dim=1)
+        true_probs = probs[:, 1] * 100  # entailment probability
+        return true_probs.tolist()
 
 @serve.deployment
 class Monolith:
@@ -156,9 +162,8 @@ class Monolith:
         self.logger = make_logger(os.getpid(), "Monolith", LOG_DIR)
         self.logger.setLevel(LOG_LEVEL)
         self.stepAudioModel = StepAudioModel()
-        self.stepEncodeModel = StepEncodeModel()
         self.stepSearchModel = StepSearchModel()
-        self.stepLangDectModel = StepLangDectModel()
+        self.stepTTSModel = StepTTSModel()
         self.stepToxCheckModel = StepToxCheckModel()
 
 
@@ -167,37 +172,78 @@ class Monolith:
         logfunc(self.logger, requestIds, "Monolith_Enter")
         res = []
         stepAudioOutput = self.stepAudioModel.exec_model(inputs)
-        stepEncodeOutput = self.stepEncodeModel.encoder.encode(stepAudioOutput)
-        stepSearchOutput = self.stepSearchModel.search(stepEncodeOutput)
-        #TODO: see if batching works here
+        stepSearchOutput = self.stepSearchModel.search(stepAudioOutput)
+
+        flattened_search_output = [item for sublist in stepSearchOutput for item in sublist]
+        stepTTSOutput = self.stepTTSModel.model_exec(flattened_search_output)
+        stepToxCheckOutput = self.stepToxCheckModel.model_exec(flattened_search_output)
+        # Reassemble outputs into the structure of stepSearchOutput
+        tts_nested_output = []
+        tox_nested_output = []
+        index = 0
+        for sublist in stepSearchOutput:
+            n = len(sublist)
+            tts_nested_output.append(stepTTSOutput[index:index+n])
+            tox_nested_output.append(stepToxCheckOutput[index:index+n])
+            index += n
+
         for i in range(len(stepSearchOutput)):
-            stepLangDectOutput = self.stepLangDectModel.model_exec(stepSearchOutput[i])
-            stepToxCheckOutput = self.stepToxCheckModel.model_exec(stepSearchOutput[i])
-            res.append((stepAudioOutput[i], stepSearchOutput[i], stepLangDectOutput, stepToxCheckOutput))
-
-
-        # this resulted in worse performance
-        # flattened_search_output = [item for sublist in stepSearchOutput for item in sublist]
-        # stepLangDectOutput = self.stepLangDectModel.model_exec(flattened_search_output)
-        # stepToxCheckOutput = self.stepToxCheckModel.model_exec(flattened_search_output)
-        # # Reassemble outputs into the structure of stepSearchOutput
-        # lang_nested_output = []
-        # tox_nested_output = []
-        # index = 0
-        # for sublist in stepSearchOutput:
-        #     n = len(sublist)
-        #     lang_nested_output.append(stepLangDectOutput[index:index+n])
-        #     tox_nested_output.append(stepToxCheckOutput[index:index+n])
-        #     index += n
-
-        # for i in range(len(stepSearchOutput)):
-        #     res.append((stepAudioOutput[i], stepSearchOutput[i], lang_nested_output[i], tox_nested_output[i]))
-
-
+            res.append((stepAudioOutput[i], stepSearchOutput[i], tts_nested_output[i].shape, tox_nested_output[i]))
 
         logfunc(self.logger, requestIds, "Monolith_Exit")
         return res
 
+@serve.deployment
+class SmartMonolith:
+    def __init__(self):
+        self.logger = make_logger(os.getpid(), "SmartMonolith", LOG_DIR)
+        self.logger.setLevel(LOG_LEVEL)
+        self.stepAudioModel = StepAudioModel()
+        self.stepSearchModel = StepSearchModel()
+        self.stepTTSModel = StepTTSModel()
+        self.stepToxCheckModel = StepToxCheckModel()
+        self.batch_size_tts = 1
+        self.batch_size_toxcheck = 4
+
+
+    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    async def __call__(self, inputs: List, requestIds: List):
+        logfunc(self.logger, requestIds, "SmartMonolith_Enter")
+        res = []
+        stepAudioOutput = self.stepAudioModel.exec_model(inputs)
+        stepSearchOutput = self.stepSearchModel.search(stepAudioOutput)
+        
+        flattened_search_output = [item for sublist in stepSearchOutput for item in sublist]
+        
+        stepTTSOutput = []
+        for i in range(0, len(flattened_search_output), self.batch_size_tts):
+            batch = flattened_search_output[i:i+self.batch_size_tts]
+            batch_result = self.stepTTSModel.model_exec(batch)
+            stepTTSOutput.extend(batch_result)
+
+        stepToxCheckOutput = []
+        for i in range(0, len(flattened_search_output), self.batch_size_toxcheck):
+            batch = flattened_search_output[i:i+self.batch_size_toxcheck]
+            batch_result = self.stepToxCheckModel.model_exec(batch)
+            stepToxCheckOutput.extend(batch_result)
+
+        # Reassemble outputs into the structure of stepSearchOutput
+        tts_nested_output = []
+        tox_nested_output = []
+        index = 0
+        for sublist in stepSearchOutput:
+            n = len(sublist)
+            tts_nested_output.append(stepTTSOutput[index:index+n])
+            tox_nested_output.append(stepToxCheckOutput[index:index+n])
+            index += n
+
+        for i in range(len(stepSearchOutput)):
+            #not the same audio shapes but essentially the same
+            res.append((stepAudioOutput[i], stepSearchOutput[i], [audio.shape for audio in tts_nested_output[i]], tox_nested_output[i]))
+
+        logfunc(self.logger, requestIds, "SmartMonolith_Exit")
+        return res
+    
 @serve.deployment
 class StepAudio:
     def __init__(self):
@@ -214,22 +260,6 @@ class StepAudio:
         return ret
 
 @serve.deployment
-class StepEncode:
-    def __init__(self):
-        self.logger = make_logger(os.getpid(), "StepEncode", LOG_DIR)
-        self.logger.setLevel(LOG_LEVEL)
-        self.model = StepEncodeModel()
-
-    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
-    async def __call__(self, inputs: List, requestIds: List):
-        logfunc(self.logger, requestIds, "StepEncode_Enter")
-        #result is numpy array
-        result =  self.model.encoder.encode(inputs)
-        logfunc(self.logger, requestIds, "StepEncode_Exit")
-        #TODO: test removing this and just returning result
-        return [result[i] for i in range(len(result))]
-
-@serve.deployment
 class StepSearch:
     def __init__(self):
         self.logger = make_logger(os.getpid(), "StepSearch", LOG_DIR)
@@ -238,23 +268,33 @@ class StepSearch:
     @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, inputs: List, requestIds: List):
         logfunc(self.logger, requestIds, "StepSearch_Enter")
-        res = self.model.search(np.stack(inputs, axis=0))
+        res = self.model.search(inputs)
         logfunc(self.logger, requestIds, "StepSearch_Exit")
         return res
     
 @serve.deployment
-class StepLangDect:
+class StepTTS:
     def __init__(self):
-        self.logger = make_logger(os.getpid(), "StepLangDect", LOG_DIR)
+        self.logger = make_logger(os.getpid(), "StepTTS", LOG_DIR)
         self.logger.setLevel(LOG_LEVEL)
-        self.model = StepLangDectModel()
+        self.model = StepTTSModel()
 
-    #@serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, inputs: Any, requestId: Any):
-        logfunc(self.logger, [requestId], "StepLangDect_Enter")
-        result =  self.model.model_exec(inputs)
-        logfunc(self.logger, [requestId], "StepLangDect_Exit")
-        return result
+        logfunc(self.logger, requestId, "StepTTS_Enter")
+        inputs_flattened = [item for sublist in inputs for item in sublist]
+        result =  self.model.model_exec(inputs_flattened)
+
+        nested_output = []
+        index = 0
+        for sublist in inputs:
+            n = len(sublist)
+            nested_output.append(result[index:index+n])
+            index += n
+
+        logfunc(self.logger, requestId, "StepTTS_Exit")
+        #don't transfer the whole thing, just return the shape
+        return [item.shape for item in nested_output]
 
 @serve.deployment
 class StepToxCheck:
@@ -263,22 +303,31 @@ class StepToxCheck:
         self.logger.setLevel(LOG_LEVEL)
         self.model = StepToxCheckModel()
     
-    #@serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
     async def __call__(self, inputs: Any, requestId: Any):
-        logfunc(self.logger, [requestId], "StepToxCheck_Enter")
-        result = self.model.model_exec(inputs)
-        logfunc(self.logger, [requestId], "StepToxCheck_Exit")
-        return result
+        logfunc(self.logger, requestId, "StepToxCheck_Enter")
+        #TODO: flatten and unflatten
+        inputs_flattened = [item for sublist in inputs for item in sublist]
+        result = self.model.model_exec(inputs_flattened)
+        # Reassemble outputs into the structure of inputs
+        nested_output = []
+        index = 0
+        for sublist in inputs:
+            n = len(sublist)
+            nested_output.append(result[index:index+n])
+            index += n
+
+        logfunc(self.logger, requestId, "StepToxCheck_Exit")
+        return nested_output
 
 @serve.deployment
 class Ingress:
-    def __init__(self, stepAudio: DeploymentHandle, stepEncode: DeploymentHandle, stepSearch: DeploymentHandle, stepLangDect: DeploymentHandle, stepToxCheck: DeploymentHandle):
+    def __init__(self, stepAudio: DeploymentHandle, stepSearch: DeploymentHandle, stepTTS: DeploymentHandle, stepToxCheck: DeploymentHandle):
         self.logger = make_logger(os.getpid(), "Ingress", LOG_DIR)
         self.logger.setLevel(LOG_LEVEL)
         self.stepAudio = stepAudio
-        self.stepEncode = stepEncode
         self.stepSearch = stepSearch
-        self.stepLangDect = stepLangDect
+        self.stepTTS = stepTTS
         self.stepToxCheck = stepToxCheck
 
     async def __call__(self, http_request: Request):
@@ -290,17 +339,16 @@ class Ingress:
             #input = pickle.loads(input)
             input = await http_request.json()
             logfunc(self.logger, [rid_obj], "Ingress_Input_Decoded")
-            inputArr = np.array(input)  
+            inputArr = np.array(input)
             logfunc(self.logger, [rid_obj], "Ingress_Numpy_Converted")
             stepaudio_output = self.stepAudio.remote(inputArr, rid_obj)
-            stepencode_output = self.stepEncode.remote(stepaudio_output, rid_obj)
             #for some reason, the next steps hang without waiting for object ref here. 
             #TODO: figure out why. Test on a simplfied pipeline and see if sending a deploymentresponse to two steps in a row causes issues
-            stepsearch_output = await self.stepSearch.remote(stepencode_output, rid_obj)._to_object_ref()
+            stepsearch_output = await self.stepSearch.remote(stepaudio_output, rid_obj)._to_object_ref()
             #stepsearch_output = self.stepSearch.remote(stepencode_output, rid_obj)
-            steplangdect_output = self.stepLangDect.remote(stepsearch_output, rid_obj)
+            stepTTS_output = self.stepTTS.remote(stepsearch_output, rid_obj)
             steptoxcheck_output = self.stepToxCheck.remote(stepsearch_output, rid_obj)
-            res = await stepaudio_output, await stepsearch_output, await steplangdect_output, await steptoxcheck_output
+            res = await stepaudio_output, await stepsearch_output, await stepTTS_output, await steptoxcheck_output
             logfunc(self.logger, [rid_obj], "Ingress_Exit")
             return res
         except Exception as e:
@@ -337,12 +385,15 @@ class Ingress_Mono:
 
 def app(args: Dict[str, str]) -> Application:
     stepAudio = StepAudio.bind()
-    stepEncode = StepEncode.bind()
     stepSearch = StepSearch.bind()
-    stepLangDect = StepLangDect.bind()
+    stepTTS = StepTTS.bind()
     stepToxCheck = StepToxCheck.bind()
-    return Ingress.bind(stepAudio=stepAudio, stepEncode=stepEncode, stepSearch=stepSearch, stepLangDect=stepLangDect, stepToxCheck=stepToxCheck)
+    return Ingress.bind(stepAudio=stepAudio, stepSearch=stepSearch, stepTTS=stepTTS, stepToxCheck=stepToxCheck)
 
 def app_mono(args: Dict[str, str]) -> Application:
     monolith = Monolith.bind()
+    return Ingress_Mono.bind(monolith=monolith)
+
+def app_mono_smart(args: Dict[str, str]) -> Application:
+    monolith = SmartMonolith.bind()
     return Ingress_Mono.bind(monolith=monolith)

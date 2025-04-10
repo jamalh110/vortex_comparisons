@@ -34,8 +34,11 @@ with open(os.path.join(data_dir, "queries_audio5000.pkl"), "rb") as f:
     queries = pickle.load(f)
 queries_filtered = []
 for i in range(len(queries)):
+    #if len(queries[i][1]) > 200000:
     if len(queries[i][1]) <= 200000:
         queries_filtered.append(queries[i])
+    else:
+        print("Query too long:", i, len(queries[i][1]))
 
 queries = queries_filtered
 print(len(queries))
@@ -47,5 +50,5 @@ for i in range(len(queries)):
     requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
     response = request_task_sync(url, query[1].tolist(), requestid=requestid)
     #print(query[0], "|",pickle.loads(response.content))
-    print(query[0], "|",response.json())
+    print(query[0], "|",response.json(), "\n\n")
     #print(json.dumps(queries[0][1].tolist(), indent=2))
