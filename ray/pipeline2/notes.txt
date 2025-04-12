@@ -11,6 +11,9 @@ pip install -r requirements.txt
 pip install ray[serve]
 
 ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.11
+ray start --address 10.10.1.11:6379 --node-ip-address 10.10.1.x
+
+
 ray metrics launch-prometheus
 wget https://dl.grafana.com/enterprise/release/grafana-enterprise-11.5.2.linux-amd64.tar.gz
 tar -zxvf grafana-enterprise-11.5.2.linux-amd64.tar.gz
