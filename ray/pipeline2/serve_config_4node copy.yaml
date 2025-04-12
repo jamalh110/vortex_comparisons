@@ -30,21 +30,46 @@ applications:
 
   route_prefix: /
 
-  import_path: main:app_mono
+  import_path: main:app
 
   # runtime_env:
   #   pip: "/users/jamalh11/vortex_comparisons/ray/requirements.txt"
 
   deployments:
 
-  - name: Monolith
-    max_ongoing_requests: 8
-    num_replicas: 4
+  - name: StepAudio
+    max_ongoing_requests: 32
     ray_actor_options:
-      num_cpus: 4.0
-      num_gpus: 0.6
+      num_cpus: 1.0
+      num_gpus: 1
+      resources:
+        mig12: 1
+
+  - name: StepSearch
+    max_ongoing_requests: 32
+    ray_actor_options:
+      num_cpus: 1.0
+      num_gpus: 0.5
+      resources:
+        mig12: 0.5
+  
+  - name: StepTTS
+    num_replicas: 6
+    max_ongoing_requests: 2
+    ray_actor_options:
+      num_cpus: 1.0
+      num_gpus: 0.5
+
+  - name: StepToxCheck
+    num_replicas: 1
+    max_ongoing_requests: 8
+    ray_actor_options:
+      num_cpus: 1.0
+      num_gpus: 0.5
+      resources:
+        mig12: 0.5
     
-  - name: Ingress_Mono
+  - name: Ingress
     num_replicas: 16
     max_ongoing_requests: 200
     ray_actor_options:

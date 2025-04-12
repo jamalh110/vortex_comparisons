@@ -37,7 +37,7 @@ from SenseVoice.model import SenseVoiceSmall
 
 
 #TODO: make the TTS shapes between smart monoloth and monolith and micro the same (not actually important, but it's bothering me)
-_MAX_BATCH_SIZE = 32
+#_MAX_BATCH_SIZE = 4
 DATA_DIR="/mydata/msmarco"
 LOG_DIR = "/users/jamalh11/raylogs"
 LOG_LEVEL = logging.INFO
@@ -167,7 +167,7 @@ class Monolith:
         self.stepToxCheckModel = StepToxCheckModel()
 
 
-    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    @serve.batch(max_batch_size=4)
     async def __call__(self, inputs: List, requestIds: List):
         logfunc(self.logger, requestIds, "Monolith_Enter")
         res = []
@@ -206,7 +206,7 @@ class SmartMonolith:
         self.batch_size_toxcheck = 4
 
 
-    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    @serve.batch(max_batch_size=8)
     async def __call__(self, inputs: List, requestIds: List):
         logfunc(self.logger, requestIds, "SmartMonolith_Enter")
         res = []
@@ -251,7 +251,7 @@ class StepAudio:
         self.logger.setLevel(LOG_LEVEL)
         self.model = StepAudioModel()
         
-    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    @serve.batch(max_batch_size=16)
     async def __call__(self, inputs: List, requestIds: List):
         logfunc(self.logger, requestIds, "StepAudio_Enter")
         #TODO: check if need to numpy stack?
@@ -265,7 +265,7 @@ class StepSearch:
         self.logger = make_logger(os.getpid(), "StepSearch", LOG_DIR)
         self.logger.setLevel(LOG_LEVEL)
         self.model = StepSearchModel()
-    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    @serve.batch(max_batch_size=16)
     async def __call__(self, inputs: List, requestIds: List):
         logfunc(self.logger, requestIds, "StepSearch_Enter")
         res = self.model.search(inputs)
@@ -279,7 +279,7 @@ class StepTTS:
         self.logger.setLevel(LOG_LEVEL)
         self.model = StepTTSModel()
 
-    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    @serve.batch(max_batch_size=1)
     async def __call__(self, inputs: Any, requestId: Any):
         logfunc(self.logger, requestId, "StepTTS_Enter")
         inputs_flattened = [item for sublist in inputs for item in sublist]
@@ -303,7 +303,7 @@ class StepToxCheck:
         self.logger.setLevel(LOG_LEVEL)
         self.model = StepToxCheckModel()
     
-    @serve.batch(max_batch_size=_MAX_BATCH_SIZE)
+    @serve.batch(max_batch_size=4)
     async def __call__(self, inputs: Any, requestId: Any):
         logfunc(self.logger, requestId, "StepToxCheck_Enter")
         #TODO: flatten and unflatten
