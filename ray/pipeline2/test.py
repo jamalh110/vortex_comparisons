@@ -66,16 +66,30 @@ nqueries = int(sys.argv[2])
 rate = 1/int(sys.argv[1])
 
 startime = time.time()
+lastsleep = 0
 for i in range(nqueries):
+    last_itr_start = time.time()
     query = queries[i]
     url = get_random_host()
     requestid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
     #response = request_task_sync(url, query[1], requestid=requestid)
     logger.info(f"Client_Send {requestid}")
+
     fire_and_forget(url, query[1], requestid=requestid)
     #print(query[0], "|",pickle.loads(response.content))
     #print(query[0], "|",response.json(), "\n\n")
     #print(json.dumps(queries[0][1].tolist(), indent=2))
-    time.sleep(rate)
+    current_time = time.time()
+    elapsed_time = current_time - last_itr_start
+    if elapsed_time < rate:
+        # Calculate the remaining time to sleep
+        sleep_time = rate - elapsed_time
+        # Sleep for the remaining time
+        time.sleep(sleep_time)
+    else:
+        # If the elapsed time is greater than the rate, no need to sleep
+        print("Elapsed time is greater than rate by", elapsed_time - rate)
+        pass
+    
 endtime = time.time()
 print("Total time taken:", endtime - startime)
