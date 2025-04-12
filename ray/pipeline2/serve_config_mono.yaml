@@ -38,7 +38,7 @@ applications:
   deployments:
 
   - name: Monolith
-    max_ongoing_requests: 4
+    max_ongoing_requests: 6
     num_replicas: 4
     ray_actor_options:
       num_cpus: 4.0

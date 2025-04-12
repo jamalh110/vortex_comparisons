@@ -21,7 +21,10 @@ SELECT_DS = range(164000, 167000)
 data_dir = "/mydata/msmarco"
 query_file = "queries_audio5000.pkl"
 hosts = [
-        "http://10.10.1.11:8000"
+        "http://10.10.1.11:8000",
+        "http://10.10.1.10:8000",
+        "http://10.10.1.9:8000",
+        "http://10.10.1.8:8000",
     ]
 
 def get_random_host():
