@@ -10,10 +10,13 @@ from myutils import make_logger
 import time
 
 hosts = [
-        "http://10.10.1.11:8000",
-        "http://10.10.1.10:8000",
         "http://10.10.1.9:8000",
         "http://10.10.1.8:8000",
+        "http://10.10.1.7:8000",
+        "http://10.10.1.6:8000",
+        "http://10.10.1.5:8000",
+        "http://10.10.1.4:8000",
+        "http://10.10.1.3:8000",
     ]
 #data_dir = "/mydata/pipeline2"
 query_file = "queries_audio1.pkl"

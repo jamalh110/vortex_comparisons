@@ -45,6 +45,7 @@ applications:
       resources:
         mig12: 1
 
+
   - name: StepSearch
     max_ongoing_requests: 32
     ray_actor_options:
@@ -53,13 +54,6 @@ applications:
       resources:
         mig6: 1
   
-  - name: StepTTS
-    num_replicas: 11
-    max_ongoing_requests: 2
-    ray_actor_options:
-      num_cpus: 1.0
-      num_gpus: 0.5
-
   - name: StepToxCheck
     num_replicas: 3
     max_ongoing_requests: 8
@@ -68,7 +62,16 @@ applications:
       num_gpus: 1
       resources:
         mig6: 1
-    
+
+  - name: StepTTS
+    num_replicas: 11
+    max_ongoing_requests: 2
+    ray_actor_options:
+      num_cpus: 1.0
+      num_gpus: 0.5
+      resources:
+        steptts: 1
+
   - name: Ingress
     num_replicas: 16
     max_ongoing_requests: 200

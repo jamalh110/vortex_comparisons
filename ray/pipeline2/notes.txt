@@ -10,9 +10,13 @@ pip install -r requirements.txt
 
 pip install ray[serve]
 
-ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.11
-ray start --address 10.10.1.11:6379 --node-ip-address 10.10.1.x
-ray start --address 10.10.1.11:6379 --node-ip-address 10.10.1.x --resources='{"mig12": 2}' --num-gpus=2
+ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.9
+ray start --address 10.10.1.9:6379 --node-ip-address 10.10.1.x
+
+ray start --head --metrics-export-port=8080 --resources='{"steptts": 2}' --node-ip-address 10.10.1.9
+ray start --address 10.10.1.9:6379 --resources='{"steptts": 2}' --node-ip-address 10.10.1.x
+CUDA_VISIBLE_DEVICES= ray start --address 10.10.1.9:6379 --resources='{"mig12": 2, "steptts": 1}' --num-gpus=2 --node-ip-address 10.10.1.x
+CUDA_VISIBLE_DEVICES= ray start --address 10.10.1.9:6379 --resources='{"mig6": 4}' --num-gpus=4 --node-ip-address 10.10.1.x
 
 ray metrics launch-prometheus
 wget https://dl.grafana.com/enterprise/release/grafana-enterprise-11.5.2.linux-amd64.tar.gz
@@ -29,3 +33,5 @@ use nvidia-smi -L to get UUIDs
 CUDA_VISIBLE_DEVICES=MIG-ebbec483-4031-5f3b-b4a6-3cdd3214d67f,MIG-5ff86a32-9c39-51a3-a489-a24a7a817a77 ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.11 --num-gpus=2
 
 locust -f locustfile.py --users 50 --spawn-rate 50 --headless -H http://10.10.1.4:8000 --processes 4
+
+sudo systemctl --now enable nvidia-dcgm
