@@ -38,11 +38,11 @@ applications:
   deployments:
 
   - name: Monolith
-    max_ongoing_requests: 8
-    num_replicas: 7
+    max_ongoing_requests: 4
+    num_replicas: 14
     ray_actor_options:
       num_cpus: 4.0
-      num_gpus: 0.6
+      num_gpus: 0.5
     
   - name: Ingress_Mono
     num_replicas: 16

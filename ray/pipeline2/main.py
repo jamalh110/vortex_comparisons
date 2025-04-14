@@ -167,7 +167,7 @@ class Monolith:
         self.stepToxCheckModel = StepToxCheckModel()
 
 
-    @serve.batch(max_batch_size=4)
+    @serve.batch(max_batch_size=2)
     async def __call__(self, inputs: List, requestIds: List):
         logfunc(self.logger, requestIds, "Monolith_Enter")
         res = []
