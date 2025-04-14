@@ -206,7 +206,7 @@ class SmartMonolith:
         self.batch_size_toxcheck = 4
 
 
-    @serve.batch(max_batch_size=8)
+    @serve.batch(max_batch_size=4)
     async def __call__(self, inputs: List, requestIds: List):
         logfunc(self.logger, requestIds, "SmartMonolith_Enter")
         res = []

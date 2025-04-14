@@ -39,13 +39,13 @@ applications:
 
   - name: SmartMonolith
     max_ongoing_requests: 8
-    num_replicas: 2
+    num_replicas: 14
     ray_actor_options:
       num_cpus: 4.0
       num_gpus: 0.5
     
   - name: Ingress_Mono
-    num_replicas: 4
+    num_replicas: 16
     max_ongoing_requests: 200
     ray_actor_options:
       num_cpus: 1.0
