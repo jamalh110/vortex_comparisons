@@ -73,7 +73,7 @@ applications:
         steptts: 1
 
   - name: Ingress
-    num_replicas: 16
+    num_replicas: 28
     max_ongoing_requests: 200
     ray_actor_options:
       num_cpus: 1.0
