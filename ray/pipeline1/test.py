@@ -27,8 +27,8 @@ from gc import get_referents
 
 LOGGING_DIR = "/users/jamalh11/raylogs"
 DATA_DIR = "/mydata"
-SELECT_DS = range(0, 6000)  
-#SELECT_DS = range(1000, 3000)
+#SELECT_DS = range(0, 6000)  
+SELECT_DS = range(1000, 3000)
 nqueries = len(SELECT_DS)
 file_path = "/mydata/ds_test.pkl"
 
