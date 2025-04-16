@@ -44,7 +44,7 @@ applications:
 
   - name: StepA
     num_replicas: 1
-    max_ongoing_requests: 32
+    max_ongoing_requests: 64
     ray_actor_options:
       num_cpus: 2.0
       num_gpus: 0.04
@@ -54,7 +54,7 @@ applications:
       
   - name: StepB
     num_replicas: 3
-    max_ongoing_requests: 32
+    max_ongoing_requests: 64
     ray_actor_options:
       num_cpus: 4.0
       num_gpus: 0.1
@@ -73,7 +73,7 @@ applications:
 
   - name: StepD
     num_replicas: 1
-    max_ongoing_requests: 32
+    max_ongoing_requests: 64
     ray_actor_options:
       num_cpus: 1.0
       num_gpus: 0.02
@@ -83,7 +83,7 @@ applications:
 
   - name: StepE
     num_replicas: 3
-    max_ongoing_requests: 32
+    max_ongoing_requests: 64
     ray_actor_options:
       num_cpus: 8.0
       num_gpus: 1

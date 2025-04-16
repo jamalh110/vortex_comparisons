@@ -18,7 +18,7 @@ logging_config:
 
   encoding: TEXT
 
-  log_level: CRITICAL
+  log_level: INFO
 
   logs_dir: null
 

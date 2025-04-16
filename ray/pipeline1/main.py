@@ -306,7 +306,7 @@ class StepE:
 
         tim = time.time()
         output = self.process_search(queries, query_embeddings, bsize)
-        #print(f"Search took {time.time() - tim} seconds")
+        print(f"Search took {time.time() - tim} seconds")
 
         ret = []
         for i in input:
