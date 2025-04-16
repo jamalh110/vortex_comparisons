@@ -33,8 +33,8 @@ from utils import make_logger, logfunc
 #TODO: test keeping tensors in gpu across ray returns and see if it is faster
 #TODO: test calling step c from step b and see if it is faster
 #TODO: test if batch works properly
-_MAX_BATCH_SIZE = 32
-_STEP_E_BATCH_SIZE = 32
+_MAX_BATCH_SIZE = 1
+_STEP_E_BATCH_SIZE = 1
 DATA_DIR="/mydata"
 LOG_DIR = "/users/jamalh11/raylogs"
 LOG_LEVEL = logging.INFO

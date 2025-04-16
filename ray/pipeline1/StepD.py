@@ -10,7 +10,7 @@ from utils import make_logger, logfunc
 import os
 import logging
 
-_MAX_BATCH_SIZE = 32
+_MAX_BATCH_SIZE = 1
 DATA_DIR="/mydata"
 LOG_DIR = "/users/jamalh11/raylogs"
 LOG_LEVEL = logging.INFO
