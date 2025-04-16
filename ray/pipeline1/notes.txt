@@ -47,8 +47,9 @@ rm lock
 
 
 For first 3 nodes:
-ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.10 --resources='{"deploy_abcd": 1}'
-ray start --address 10.10.1.10:6379 --node-ip-address 10.10.1.1 --resources='{"deploy_abcd": 1}'
+cd ~/vortex_comparisons/ray/pipeline1
+ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.9 --resources='{"deploy_abcd": 1}'
+ray start --address 10.10.1.9:6379 --node-ip-address 10.10.1.1 --resources='{"deploy_abcd": 1}'
 
 MIG partitions for 4th node:
 sudo nvidia-smi -i 0 -mig 1
@@ -60,7 +61,7 @@ to delete,
 
 
 run ray like so:
-CUDA_VISIBLE_DEVICES=MIG-9a135554-b579-5904-b2ff-082d37ad44c7,MIG-57cc5694-a482-58fe-8fa5-2fd559eccf92,MIG-cb4a71e4-9f5a-54c7-9128-36997dddfa0c,MIG-4490851e-55cf-534c-93ee-12d4d109e659  ray start --address 10.10.1.10:6379 --node-ip-address 10.10.1.9 --num-gpus=4 --resources='{"deploy_e": 4}'
+CUDA_VISIBLE_DEVICES= ray start --address 10.10.1.9:6379 --node-ip-address 10.10.1.8 --num-gpus=4 --resources='{"deploy_e": 4}'
 
 To deploy ray serve:
 serve shutdown -y && serve deploy serve_config.yaml
