@@ -315,9 +315,9 @@ class StepE:
 
         query_embeddings = torch.stack(query_embeddings_list, dim=0).cuda()
 
-        #tim = time.time()
+        tim = time.time()
         output = self.process_search(queries, query_embeddings, bsize)
-        #print(f"Search took {time.time() - tim} seconds")
+        print(f"Search took {time.time() - tim} seconds")
 
         ret = []
         for i in input1:

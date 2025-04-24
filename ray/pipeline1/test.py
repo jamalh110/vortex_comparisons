@@ -27,20 +27,20 @@ from gc import get_referents
 
 LOGGING_DIR = "/users/jamalh11/raylogs"
 DATA_DIR = "/mydata"
-#SELECT_DS = range(0, 6000)  
-SELECT_DS = range(1000, 3000)
+SELECT_DS = range(0, 6000)  
+#SELECT_DS = range(1000, 3000)
 nqueries = len(SELECT_DS)
 file_path = "/mydata/ds_test.pkl"
 
 hosts = [
-        #"http://10.10.1.10:8000",
-        "http://10.10.1.9:8000",
-        "http://10.10.1.8:8000",
-        "http://10.10.1.7:8000",
-        "http://10.10.1.6:8000",
-        #"http://10.10.1.3:8000",
-        #"http://10.10.1.2:8000",
-        #"http://10.10.1.1:8000",
+        # "http://10.10.1.10:8000",
+        # "http://10.10.1.9:8000",
+        # "http://10.10.1.8:8000",
+        # "http://10.10.1.7:8000",
+        "http://10.10.1.4:8000",
+        "http://10.10.1.3:8000",
+        "http://10.10.1.2:8000",
+        "http://10.10.1.1:8000",
     ]
 session = None
 
