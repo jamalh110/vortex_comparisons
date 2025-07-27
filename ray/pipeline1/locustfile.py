@@ -24,10 +24,10 @@ import numpy as np
 SELECT_DS = range(0, 6000)  
 DATA_DIR = "/mydata"
 hosts = [
-        "http://10.10.1.10:8000",
-        "http://10.10.1.9:8000",
-        "http://10.10.1.8:8000",
-        "http://10.10.1.7:8000",
+        "http://10.10.1.1:8000",
+        "http://10.10.1.2:8000",
+        "http://10.10.1.3:8000",
+        "http://10.10.1.4:8000",
     ]
 def get_random_host():
         """Return a randomly selected host from the list."""

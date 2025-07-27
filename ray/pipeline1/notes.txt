@@ -35,8 +35,8 @@ do the inat zip fix:
 
 cd /mydata/EVQA
 sudo apt install zip
-sudo zip -FFv inat.zip --out fixed.zip
-sudo unzip fixed.zip -d inat/ > /dev/null 2>&1 
+sudo zip -FFv inat.zip --out fixed.zip > /dev/null 2>&1
+sudo unzip fixed.zip -d inat/ > /dev/null 2>&1
 
 
 IF STEP E FREEZES ON __INIT__ loading torch extension:
@@ -48,8 +48,8 @@ rm lock
 
 For first 3 nodes:
 cd ~/vortex_comparisons/ray/pipeline1
-ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.9 --resources='{"deploy_abcd": 1}'
-ray start --address 10.10.1.9:6379 --node-ip-address 10.10.1.1 --resources='{"deploy_abcd": 1}'
+ray start --head --metrics-export-port=8080 --node-ip-address 10.10.1.1 --resources='{"deploy_abcd": 1}'
+ray start --address 10.10.1.x:6379 --node-ip-address 10.10.1.1 --resources='{"deploy_abcd": 1}'
 
 MIG partitions for 4th node:
 sudo nvidia-smi -i 0 -mig 1
