@@ -33,8 +33,8 @@ from utils import make_logger, logfunc
 #TODO: test keeping tensors in gpu across ray returns and see if it is faster
 #TODO: test calling step c from step b and see if it is faster
 #TODO: test if batch works properly
-_MAX_BATCH_SIZE = 1
-_STEP_E_BATCH_SIZE = 1
+_MAX_BATCH_SIZE = 32
+_STEP_E_BATCH_SIZE = 32
 DATA_DIR="/mydata"
 LOG_DIR = "/users/jamalh11/raylogs"
 #LOG_LEVEL = logging.INFO
@@ -235,11 +235,11 @@ class StepB:
             )
         
         #print("here2")
-        vision_encoder_outputs = self.query_vision_encoder(pixel_values, output_hidden_states=True)
-        vision_embeddings = vision_encoder_outputs.last_hidden_state[:, 0]
-        
-        vision_embeddings = self.query_vision_projection(vision_embeddings)
-        vision_embeddings = vision_embeddings.view(batch_size, -1, self.flmr_config.dim)
+        with torch.no_grad():
+            vision_encoder_outputs = self.query_vision_encoder(pixel_values, output_hidden_states=True)
+            vision_embeddings = vision_encoder_outputs.last_hidden_state[:, 0]
+            vision_embeddings = self.query_vision_projection(vision_embeddings)
+            vision_embeddings = vision_embeddings.view(batch_size, -1, self.flmr_config.dim)
     
         vision_second_last_layer_hidden_states = vision_encoder_outputs.hidden_states[-2][:, 1:]
         

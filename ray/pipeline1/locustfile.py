@@ -29,9 +29,12 @@ hosts = [
         "http://10.10.1.3:8000",
         "http://10.10.1.4:8000",
     ]
+host_counter = 0
 def get_random_host():
         """Return a randomly selected host from the list."""
-        return random.choice(hosts)
+        host_counter+=1
+        return hosts[host_counter%len(hosts)]
+        #return random.choice(hosts)
 
 def add_path_prefix_in_img_path(example, prefix):
     if example["img_path"] is not None:

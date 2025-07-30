@@ -1,0 +1,82 @@
+# This file was generated using the `serve build` command on Ray v2.42.1.
+
+proxy_location: EveryNode
+
+http_options:
+
+  host: 0.0.0.0
+
+  port: 8000
+
+grpc_options:
+
+  port: 9000
+
+  grpc_servicer_functions: []
+
+logging_config:
+
+  encoding: TEXT
+
+  log_level: CRITICAL
+
+  logs_dir: null
+
+  enable_access_log: true
+
+applications:
+
+- name: app1
+
+  route_prefix: /
+
+  import_path: main_directsend:app
+
+  args:
+    experiment_name: EVQA_train_split/
+    index_name: EVQA_PreFLMR_ViT-L
+    loglevel: INFO
+
+  runtime_env: {}
+
+  deployments:
+
+  - name: StepA
+    num_replicas: 1
+    max_ongoing_requests: 32
+    ray_actor_options:
+      num_cpus: 4.0
+      num_gpus: 0.1
+      
+  - name: StepB
+    num_replicas: 3
+    max_ongoing_requests: 32
+    ray_actor_options:
+      num_cpus: 4.0
+      num_gpus: 0.2
+
+  - name: StepD
+    num_replicas: 1
+    max_ongoing_requests: 32
+    ray_actor_options:
+      num_cpus: 4.0
+      num_gpus: 0.1
+
+  - name: StepE
+    num_replicas: 3
+    max_ongoing_requests: 32
+    ray_actor_options:
+      num_cpus: 4.0
+      num_gpus: 0.2
+      runtime_env:
+          env_vars:
+            COLBERT_LOAD_TORCH_EXTENSION_VERBOSE: "True"
+
+  - name: Ingress
+    num_replicas: 16
+    max_ongoing_requests: 100
+    ray_actor_options:
+      num_cpus: 1.0
+      num_gpus: 0
+    logging_config:
+      log_level: CRITICAL
