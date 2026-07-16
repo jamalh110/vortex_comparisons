@@ -22,19 +22,21 @@ import numpy as np
 # Global configuration and helper functions
 
 SELECT_DS = range(0, 6000)  
-DATA_DIR = "/mydata"
-hosts = [
-        "http://10.10.1.1:8000",
-        "http://10.10.1.2:8000",
-        "http://10.10.1.3:8000",
-        "http://10.10.1.4:8000",
-    ]
+DATA_DIR = os.environ.get("DATA_ROOT", "/mydata")
+# Ray serve nodes (node1-4). node0 is Locust-only.
+hosts = os.environ.get(
+    "RAY_SERVE_HOSTS",
+    (
+        "http://10.10.1.2:8000,http://10.10.1.3:8000,"
+        "http://10.10.1.4:8000,http://10.10.1.5:8000"
+    ),
+).split(",")
 host_counter = 0
 def get_random_host():
-        """Return a randomly selected host from the list."""
-        host_counter+=1
-        return hosts[host_counter%len(hosts)]
-        #return random.choice(hosts)
+        """Return a round-robin host from the Ray serve nodes."""
+        global host_counter
+        host_counter += 1
+        return hosts[host_counter % len(hosts)]
 
 def add_path_prefix_in_img_path(example, prefix):
     if example["img_path"] is not None:
@@ -111,8 +113,8 @@ use_split = "train"
 ds_dir = f"{DATA_DIR}/EVQA/EVQA_data"
 p_ds_dir = f"{DATA_DIR}/EVQA/EVQA_passages"
 
-image_processor_name = '/mydata/clip-vit-large-patch14'
-checkpoint_path = '/mydata/PreFLMR_ViT-L'
+image_processor_name = f"{DATA_DIR}/clip-vit-large-patch14"
+checkpoint_path = f"{DATA_DIR}/PreFLMR_ViT-L"
 flmr_config = FLMRConfig.from_pretrained(checkpoint_path)
 query_tokenizer = FLMRQueryEncoderTokenizer.from_pretrained(checkpoint_path,
                                                                 text_config=flmr_config.text_config,
@@ -168,7 +170,7 @@ counter_lock = threading.Lock()
 #     bytes_to_send.append((data_bytes, requestid))
     
 bytes_to_send = []
-file_path = "/mydata/ds_test.pkl"
+file_path = f"{DATA_DIR}/ds_test.pkl"
 if not os.path.exists(file_path):
     for i in tqdm(range(len(ds)), desc="Preparing bytes to send"):
         data = ds[i]

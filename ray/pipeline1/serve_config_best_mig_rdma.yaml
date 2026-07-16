@@ -1,0 +1,112 @@
+# This file was generated using the `serve build` command on Ray v2.42.1.
+
+proxy_location: EveryNode
+
+http_options:
+
+  host: 0.0.0.0
+
+  port: 8000
+
+grpc_options:
+
+  port: 9000
+
+  grpc_servicer_functions: []
+
+logging_config:
+
+  encoding: TEXT
+
+  log_level: CRITICAL
+
+  logs_dir: null
+
+  enable_access_log: true
+
+applications:
+
+- name: app1
+
+  route_prefix: /
+
+  import_path: main_rdma:app
+  #import_path: main:app
+
+  args:
+    experiment_name: EVQA_train_split
+    index_name: EVQA_PreFLMR_ViT-L
+    loglevel: INFO
+
+  runtime_env:
+    env_vars:
+      PYTHONPATH: "/users/jamalh11/vortex_comparisons/ray/pipeline1:/users/jamalh11/workspace/FLMR/third_party/ColBERT:/users/jamalh11/workspace/FLMR"
+      PATH: "/usr/local/cuda/bin:/usr/local/bin:/usr/bin:/bin"
+      LD_LIBRARY_PATH: "/usr/local/lib/python3.10/dist-packages/nixl_cu12.libs:/usr/local/cuda/lib64:/usr/local/lib"
+      UCX_MODULE_DIR: "/usr/local/lib/python3.10/dist-packages/nixl_cu12.libs/ucx"
+      UCX_NET_DEVICES: "mlx5_0:1"
+      UCX_IB_GID_INDEX: "3"
+      UCX_TLS: "rc_x,cuda_copy,self"
+      NCCL_IB_HCA: "mlx5_0"
+
+  deployments:
+
+  - name: StepA
+    num_replicas: 1
+    max_ongoing_requests: 64
+    ray_actor_options:
+      num_cpus: 2.0
+      num_gpus: 0.04
+      resources:
+        #deploy_abcd: 0.01
+        deploy_e: 0.01
+      
+  - name: StepB
+    num_replicas: 3
+    max_ongoing_requests: 64
+    ray_actor_options:
+      num_cpus: 4.0
+      num_gpus: 0.1
+      resources:
+        deploy_abcd: 0.7
+
+  # - name: StepC
+  #   num_replicas: 1
+  #   max_ongoing_requests: 32
+  #   ray_actor_options:
+  #     num_cpus: 2.0
+  #     num_gpus: 0.015
+  #     resources:
+  #       #deploy_abcd: 0.01
+  #       deploy_e: 0.01
+
+  - name: StepD
+    num_replicas: 1
+    max_ongoing_requests: 64
+    ray_actor_options:
+      num_cpus: 1.0
+      num_gpus: 0.02
+      resources:
+        #deploy_abcd: 0.01
+        deploy_e: 0.01
+
+  - name: StepE
+    num_replicas: 3
+    max_ongoing_requests: 64
+    ray_actor_options:
+      num_cpus: 8.0
+      num_gpus: 1
+      resources:
+        deploy_e: 0.9
+      runtime_env:
+          env_vars:
+            COLBERT_LOAD_TORCH_EXTENSION_VERBOSE: "True"
+
+  - name: Ingress
+    num_replicas: 16
+    max_ongoing_requests: 100
+    ray_actor_options:
+      num_cpus: 1.0
+      num_gpus: 0
+    logging_config:
+      log_level: CRITICAL

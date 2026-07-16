@@ -35,8 +35,8 @@ from utils import make_logger, logfunc
 #TODO: test if batch works properly
 _MAX_BATCH_SIZE = 32
 _STEP_E_BATCH_SIZE = 32
-DATA_DIR="/mydata"
-LOG_DIR = "/users/jamalh11/raylogs"
+DATA_DIR = os.environ.get("DATA_ROOT", "/mydata")
+LOG_DIR = os.environ.get("LOG_ROOT", "/users/jamalh11/raylogs")
 #LOG_LEVEL = logging.INFO
 
 

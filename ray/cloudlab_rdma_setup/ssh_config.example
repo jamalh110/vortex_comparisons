@@ -1,0 +1,28 @@
+# Replace HostName values with the public hostnames from the new reservation.
+# Append the edited entries to ~/.ssh/config on node0.
+
+Host node0
+  HostName node0.example.wisc.cloudlab.us
+  User jamalh11
+  IdentityFile ~/.ssh/id_ed25519
+
+Host node1
+  HostName node1.example.wisc.cloudlab.us
+  User jamalh11
+  IdentityFile ~/.ssh/id_ed25519
+
+Host node2
+  HostName node2.example.wisc.cloudlab.us
+  User jamalh11
+  IdentityFile ~/.ssh/id_ed25519
+
+Host node3
+  HostName node3.example.wisc.cloudlab.us
+  User jamalh11
+  IdentityFile ~/.ssh/id_ed25519
+
+Host node4
+  HostName node4.example.wisc.cloudlab.us
+  User jamalh11
+  IdentityFile ~/.ssh/id_ed25519
+

@@ -1,0 +1,15 @@
+torch==2.1.2
+torchvision==0.16.2
+numpy==1.26.4
+huggingface-hub==0.24.7
+tokenizers==0.19.1
+transformers==4.44.2
+datasets==2.21.0
+pillow==12.3.0
+easydict==1.13
+locust==2.45.0
+colbert-ai==0.2.22
+protobuf==4.25.9
+safetensors
+packaging
+pyyaml
